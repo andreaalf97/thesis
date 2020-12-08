@@ -1,0 +1,3 @@
+http://nlp.seas.harvard.edu/2018/04/03/attention.html  <--- Contains PyTorch code for the transformer !!!
+http://jalammar.github.io/illustrated-transformer/	 <--- Visualization of the transformer
+https://www.facebook.com/wdeepvision2020/videos/768297003926318/	<--- Attention can replace CNNs completely!
