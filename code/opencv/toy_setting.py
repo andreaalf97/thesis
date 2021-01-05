@@ -23,7 +23,7 @@ def get_ts_image(height, width, max_gates=3, padding=5) -> (np.ndarray, list):
 
     # img = print_gate(img, gate)
 
-    gate.rand_shift(perc=0.20)
+    # gate.rand_shift(perc=0.20)
 
     img = print_gate(img, gate, mark_top_corners=True)
 
@@ -133,7 +133,7 @@ def get_ts_background(height, width, real_background_prob=0.0, bgr=False, black_
 
 
 if __name__ == '__main__':
-    image, labels = get_ts_image(224, 224)
+    image, labels = get_ts_image(540, 960)
 
     cv2.imwrite("test.png", image)
 
