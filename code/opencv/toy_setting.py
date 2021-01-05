@@ -6,28 +6,31 @@ import os
 from gate import Gate
 
 
-
-
-def get_ts_image(height, width, max_gates=3, padding=5) -> (np.ndarray, list):
+def get_ts_image(height, width, num_gates=3, padding=5, rand_gate_number=False) -> (np.ndarray, list):
     assert padding >= 0 and isinstance(padding, int)
+
+    if rand_gate_number:
+        if random.random() < 0.10:
+            num_gates = 0
+        else:
+            num_gates = random.randint(1, num_gates)
 
     img = get_ts_background(height, width, bgr=True, real_background_prob=0.0, black_white=True)
 
-    if img[0][0][0] == 0:
-        gate = Gate(height, width, perc_of_image_width=0.80, color='white')
-    else:
-        gate = Gate(height, width, perc_of_image_width=0.80, color='black')
+    labels = []
 
-    # img = print_gate(img, gate, mark_top_corners=True)
-    gate.rand_rotate(horizontal=False)
+    for _ in range(num_gates):
+        if img[0][0][0] == 0:
+            gate = Gate(height, width, perc_of_image_width=0.60, color='white')
+        else:
+            gate = Gate(height, width, perc_of_image_width=0.80, color='black')
 
-    # img = print_gate(img, gate)
+        gate.rand_rotate(horizontal=False)
+        gate.rand_shift(perc=0.20)
+        labels.append(gate.get_labels())
+        img = print_gate(img, gate, mark_top_corners=False)
 
-    # gate.rand_shift(perc=0.20)
-
-    img = print_gate(img, gate, mark_top_corners=True)
-
-    return img, gate.get_labels()
+    return img, labels
 
 
 def print_gate(img:np.ndarray, gate: Gate, mark_top_corners=False) -> np.ndarray:
@@ -104,10 +107,12 @@ def get_ts_background(height, width, real_background_prob=0.0, bgr=False, black_
             dtype=np.uint8
         )
 
-        if random.random() > 0.5:
-            image[:, :] = [0, 0, 0]
-        else:
-            image[:, :] = [255, 255, 255]
+        # if random.random() > 0.5:
+        #     image[:, :] = [0, 0, 0]
+        # else:
+        #     image[:, :] = [255, 255, 255]
+
+        image[:, :] = [0, 0, 0]
 
         return image
 
@@ -132,14 +137,20 @@ def get_ts_background(height, width, real_background_prob=0.0, bgr=False, black_
     return image
 
 
-if __name__ == '__main__':
-    image, labels = get_ts_image(540, 960)
-
-    cv2.imwrite("test.png", image)
-
+def display_image(image: np.ndarray, labels):
     cv2.imshow("THERE ARE {} GATES".format(len(labels)), image)
+    print(labels)
     cv2.waitKey()
     cv2.destroyAllWindows()
+
+
+if __name__ == '__main__':
+    # image, labels = get_ts_image(540, 960)
+    image, labels = get_ts_image(128, 128, rand_gate_number=True, num_gates=3)
+
+    # cv2.imwrite("test.png", image)
+
+    display_image(image, labels)
 
 # img = cv2.line(
 #     img=img,

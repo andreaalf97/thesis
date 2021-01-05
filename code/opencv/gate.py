@@ -14,7 +14,7 @@ class Gate:
             int(self.width * 1.5) if self.width * 1.5 < self.image_height else int(self.image_height)
         )
 
-        self.stroke = random.randint(4, 10)
+        self.stroke = random.randint(1, 4)
 
         if 'white' in color.lower():
             self.color = (255, 255, 255)
