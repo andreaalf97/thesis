@@ -1,5 +1,5 @@
 from image_gen import display_image, get_ts_image
-from detr import Transformer
+from detr import Transformer, get_ordered_matrices
 from data import TSDataset
 import torchvision.transforms as T
 import torch.utils.data as D
@@ -19,7 +19,10 @@ num_batches_per_epoch = 50
 
 if __name__ == '__main__':
 
-
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+    else:
+        device = torch.device("cpu")
 
     transform = T.ToTensor()
 
@@ -37,7 +40,8 @@ if __name__ == '__main__':
     #     print(len(labels))
     #     break
 
-    model = Transformer(1)
+    model = Transformer(num_classes=1)
+    model.to(device)
 
     param_dicts = [
         {"params": [p for n, p in model.named_parameters() if "backbone" not in n and p.requires_grad]},
@@ -56,15 +60,27 @@ if __name__ == '__main__':
 
     for e in range(epochs):
         print("Starting epoch {}".format(e+1))
-        for _ in range(num_batches_per_epoch):
-            pass
+        for i, sample in enumerate(train_loader):
+
+            image, labels = sample
+            image = image.to(device)
+            labels = labels.to(device)
+
+            output = model(image)
+
+            pred_logits = output["pred_logits"]
+            pred_boxes = output["pred_boxes"]
+
+            gt_logits_ordered, gt_boxes_ordered = get_ordered_matrices(labels, pred_logits, pred_boxes)
+
+            exit(-1)
 
     end_time = time.time()
     print("FINISHED TRAINING")
 
     total_time = end_time - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
-    print('Completed {} epochs in {}\\{} batches per epoch'.format(epochs, total_time_str, num_batches_per_epoch))
+    print('Completed {} epochs in {}\n{} batches per epoch'.format(epochs, total_time_str, num_batches_per_epoch))
 
 
 

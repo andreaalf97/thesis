@@ -1,5 +1,6 @@
 import torch.utils.data as t_data
 from image_gen import get_ts_image
+from torch import tensor
 
 
 class TSDataset(t_data.Dataset):
@@ -35,5 +36,6 @@ class TSDataset(t_data.Dataset):
 
         if self.transform:
             image = self.transform(image)
+            labels = tensor(labels)
 
         return image, labels

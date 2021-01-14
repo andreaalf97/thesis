@@ -3,3 +3,4 @@ misc/*.mp4
 code/image_gen/samples
 code/image_gen/backgrounds
 google-research/
+code/detr/test_tensors
