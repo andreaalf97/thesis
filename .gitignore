@@ -1,5 +1,5 @@
 misc/*.mp4
 .idea
-code/opencv/samples
-code/opencv/backgrounds
+code/toy_setting_open_cv/samples
+code/toy_setting_open_cv/backgrounds
 google-research/

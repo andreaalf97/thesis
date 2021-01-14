@@ -26,7 +26,6 @@ def gate_to_gate_loss(predicted: list, ground_truth: list, ordered_corners=False
 
         return loss
 
-
     # Creating the bipartite graph
 
     string_names_predicted = ['one_p', 'two_p', 'three_p', 'four_p', 'five_p', 'six_p', 'seven_p', 'eight_p', 'nine_p']
@@ -50,7 +49,7 @@ def gate_to_gate_loss(predicted: list, ground_truth: list, ordered_corners=False
     return res
 
 
-def orderless_loss(predicted: list, ground_truth: list) -> float:
+def orderless_loss(predicted: list, ground_truth: list, epsilon=1e-5) -> float:
 
     for gate in predicted:
         assert len(gate) == 4
@@ -74,7 +73,7 @@ def orderless_loss(predicted: list, ground_truth: list) -> float:
             gate_p_g = ground_truth[p_g]
             l = gate_to_gate_loss(gate_p_i, gate_p_g, ordered_corners=True)
             if l == 0.0:
-                l += 0.0001
+                l += epsilon
             p_i_dict[string_names_ground[p_g]] = l
         bipartite_weighted_graph[string_names_predicted[p_i]] = p_i_dict
 
@@ -83,13 +82,11 @@ def orderless_loss(predicted: list, ground_truth: list) -> float:
     for name_p in bipartite_weighted_graph:
         print("Dictionary associated with {}: {}".format(name_p.upper(), bipartite_weighted_graph[name_p]))
 
-
     res = algorithm.find_matching(bipartite_weighted_graph, matching_type='min', return_type='total')
 
     # print(res)
 
     return res
-
 
 
 if __name__ == '__main__':
