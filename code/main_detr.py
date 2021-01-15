@@ -1,5 +1,5 @@
 from image_gen import display_image, get_ts_image
-from detr import Transformer, get_ordered_matrices
+from detr import Transformer, get_ordered_matrix, compute_prob_loss, compute_coord_loss
 from data import TSDataset
 import torchvision.transforms as T
 import torch.utils.data as D
@@ -71,9 +71,19 @@ if __name__ == '__main__':
             pred_logits = output["pred_logits"]
             pred_boxes = output["pred_boxes"]
 
-            gt_logits_ordered, gt_boxes_ordered = get_ordered_matrices(labels, pred_logits, pred_boxes)
+            gt_logits_matrices = []
+            gt_boxes_matrices = []
+            for labels_b, pred_logits_b, pred_boxes_b in zip(labels, pred_logits, pred_boxes):
+                gt_logits, gt_boxes = get_ordered_matrix(labels_b, pred_logits_b, pred_boxes_b)
+                gt_logits_matrices.append(gt_logits)
+                gt_boxes_matrices.append(gt_boxes)
 
-            exit(-1)
+            gt_logits = torch.stack(gt_logits_matrices).to(device)
+            gt_boxes = torch.stack(gt_boxes_matrices).to(device)
+
+            prob_loss = compute_prob_loss(pred_logits, gt_logits)
+            box_loss = compute_coord_loss(pred_boxes, gt_boxes)
+
 
     end_time = time.time()
     print("FINISHED TRAINING")

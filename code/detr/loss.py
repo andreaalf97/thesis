@@ -1,5 +1,5 @@
 import torch
-from munkres import Munkres, print_matrix
+from munkres import Munkres
 
 """
 As input we have:
@@ -17,29 +17,24 @@ As input we have:
 
 
 @torch.no_grad()
-def get_ordered_matrices(labels: torch.Tensor, pred_logits_batched: torch.Tensor, pred_boxes_batched: torch.Tensor) -> (torch.Tensor, torch.Tensor):
+def get_ordered_matrix(labels: torch.Tensor, pred_logits: torch.Tensor, pred_boxes: torch.Tensor) -> (torch.Tensor, torch.Tensor):
     """ For now, this only works with batches of 1 image """
 
-    # Labels.shape == [1, *, 4, 2]
-    assert list(labels.shape)[0] == 1 and \
-           list(labels.shape)[2] == 4 and \
-           list(labels.shape)[3] == 2
+    # Labels.shape == [*, 4, 2]
+    if not list(labels.shape) == [0]:
+        assert (list(labels.shape)[1] == 4 and \
+           list(labels.shape)[2] == 2)
 
-    assert list(pred_logits_batched.shape) == [1, 100, 2] and \
-           list(pred_boxes_batched.shape) == [1, 100, 8]
+    assert list(pred_logits.shape) == [100, 2] and \
+           list(pred_boxes.shape) == [100, 8]
 
-    print("###################")
-
-    labels = labels[0].tolist()
-
-    pred_logits = pred_logits_batched[0]
-    pred_boxes = pred_boxes_batched[0]
+    labels = labels.tolist()
 
     label_classes = []
     for _ in labels:
         label_classes.append(0)
 
-    while len(labels) < list(pred_logits_batched.shape)[1]:
+    while len(labels) < list(pred_logits.shape)[0]:
         labels.append([
             [0.0, 0.0],
             [0.0, 0.0],
@@ -60,9 +55,22 @@ def get_ordered_matrices(labels: torch.Tensor, pred_logits_batched: torch.Tensor
     m = Munkres()
 
     indices = m.compute(bipartite_match)
-    print(indices)
 
-    exit(-1)
+    # Here we create 2 matrices:
+    # output_logits has shape [100, 1] (100 predictions x 1 class index)
+    # output_boxes has shape [100, 8] (100 predictions x 8 coordinates)
+    # The loss is then just the cross entropy with output_logits and the l1 distance with output_boxes
+
+    output_logits = torch.zeros([100, 1], dtype=torch.int32)
+    output_boxes = torch.zeros([100, 8], dtype=torch.float64)
+    for pred_index, label_index in indices:
+        output_logits[pred_index] = label_classes[label_index]
+        if label_classes[label_index] != 1:
+            output_boxes[pred_index] = torch.flatten(torch.tensor(labels[label_index]))
+        else:
+            output_boxes[pred_index] = pred_boxes[pred_index]
+
+    return output_logits, output_boxes
 
 
 @torch.no_grad()
@@ -89,6 +97,19 @@ def gate_to_gate(pred_logit: torch.Tensor, pred_box: torch.Tensor, label_coord: 
     return final_loss.item()
 
 
+def compute_prob_loss(pred_logits_batched: torch.Tensor, gt_logits_batched: torch.Tensor) -> torch.Tensor:
+
+    loss = torch.tensor([0.0], dtype=torch.float64).to(torch.device(str(pred_logits_batched.device)))
+    for pred_logits, gt_logits in zip(pred_logits_batched, gt_logits_batched):
+        for prediction, gt in zip(pred_logits, gt_logits):
+            softmax_prediction = torch.softmax(prediction, dim=0)
+            loss += -torch.log(softmax_prediction[gt.item()])
+    return loss
+
+
+def compute_coord_loss(pred_boxes_batched: torch.Tensor, gt_boxes_batched: torch.Tensor) -> torch.Tensor:
+    return torch.sum(torch.abs(gt_boxes_batched - pred_boxes_batched))
+
 if __name__ == '__main__':
     image = torch.load("test_tensors/image.pt")
 
@@ -100,4 +121,12 @@ if __name__ == '__main__':
     pred_logits = torch.load("test_tensors/pred_logits.pt")
     pred_boxes = torch.load("test_tensors/pred_boxes.pt")
 
-    matrix1, matrix2 = get_ordered_matrices(labels, pred_logits, pred_boxes)
+    gt_logits, gt_boxes = get_ordered_matrix(labels[0], pred_logits[0], pred_boxes[0])
+
+    gt_logits = torch.unsqueeze(gt_logits, dim=0).cuda()
+    gt_boxes = torch.unsqueeze(gt_boxes, dim=0).cuda()
+
+    prob_loss = compute_prob_loss(pred_logits, gt_logits)
+    box_loss = compute_coord_loss(pred_boxes, gt_boxes)
+
+    print("PROB LOSS: {}\nBOX LOSS: {}\nTOTAL LOSS: {}".format(prob_loss, box_loss, prob_loss+box_loss))
