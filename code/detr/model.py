@@ -45,6 +45,12 @@ class Transformer(nn.Module):
         self.col_embed = nn.Parameter(torch.rand(50, hidden_dim // 2))
 
     def forward(self, inputs):
+
+        print("==========================")
+        print("ENTERING THE forward() FUNCTION OF DETR")
+
+        print("INPUT:", list(inputs.shape))
+
         # propagate inputs through ResNet-50 up to avg-pool layer
         x = self.backbone.conv1(inputs)
         x = self.backbone.bn1(x)
@@ -56,16 +62,28 @@ class Transformer(nn.Module):
         x = self.backbone.layer3(x)
         x = self.backbone.layer4(x)
 
+        print("OUTPUT OF BACKBONE CNN:", list(x.shape))  # [batch, 2048, H/16, W/16]
+
         # convert from 2048 to 256 feature planes for the transformer
         h = self.conv(x)
 
+        print("AFTER CONVERSION LAYER:", list(h.shape))  # [batch, 256, H/16, W/16]
+
         # construct positional encodings
-        H, W = h.shape[-2:]
+        H, W = h.shape[-2:]  # H and W of the features that come out of the backbone
         pos = torch.cat([
             self.col_embed[:W].unsqueeze(0).repeat(H, 1, 1),
             self.row_embed[:H].unsqueeze(1).repeat(1, W, 1),
         ], dim=-1).flatten(0, 1).unsqueeze(1)
 
+        print("POSITIONAL ENCODINGS:", pos.shape)
+        exit(-1)
+
+        # The forward pass of the transformer takes two inputs:
+        # FIRTS: the sequence to the encoder.
+        #       This is the output of the backbone for us
+        # SECOND: the sequence to the decoder
+        #       This are the OBJECT QUERIES for us
         # propagate through the transformer
         h = self.transformer(pos + 0.1 * h.flatten(2).permute(2, 0, 1),
                              self.query_pos.unsqueeze(1)).transpose(0, 1)

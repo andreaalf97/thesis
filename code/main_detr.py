@@ -26,7 +26,7 @@ if __name__ == '__main__':
 
     transform = T.ToTensor()
 
-    dataset = TSDataset(256, 256, transform=transform)
+    dataset = TSDataset(512, 512, transform=transform)
 
     train_loader = D.DataLoader(
         dataset,
