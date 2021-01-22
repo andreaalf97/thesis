@@ -88,7 +88,7 @@ def get_args_parser():
                         help='path where to save, empty for no saving')
     parser.add_argument('--device', default='cuda',
                         help='device to use for training / testing')
-    parser.add_argument('--seed', default=20689, type=int)  # default 43
+    parser.add_argument('--seed', default=43, type=int)  # default 43
     parser.add_argument('--save_model_to', default='', type=str)
     parser.add_argument('--resume', default='', help='resume from checkpoint')
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N',
@@ -204,7 +204,7 @@ def main(args):
             lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
             args.start_epoch = checkpoint['epoch'] + 1
 
-    if not args.eval:
+    if args.eval:
         evaluate_toy_setting(model, data_loader_val, device, args)
         return
 
@@ -218,7 +218,6 @@ def main(args):
         train_stats = train_one_epoch(
             model, criterion, data_loader_train, optimizer, device, epoch,
             args.clip_max_norm)
-        # print("TRAINED FOR 1 EPOCH ################################")
         lr_scheduler.step()
         if args.output_dir:
             checkpoint_paths = [output_dir / 'checkpoint.pth']

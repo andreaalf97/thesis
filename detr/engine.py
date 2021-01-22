@@ -340,7 +340,7 @@ def show_coco_sample(samples, targets, s_num=0):
 def evaluate_toy_setting(model, data_loader_val, device, args):
     assert args.pretrained_model != '', "Give path to pretrained model with --pretrained_model"
 
-    if False and args.training_output_file != '':
+    if args.training_output_file != '':
         with open(args.training_output_file, 'r') as file:
 
             epoch_list = []
