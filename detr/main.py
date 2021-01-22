@@ -96,7 +96,7 @@ def get_args_parser():
 
     parser.add_argument('--eval', action='store_true')
     parser.add_argument('--pretrained_model', default='tmp/10slots_300epochs_24h.pth')
-    parser.add_argument('--training_output_file', default='tmp/10slots_300epochs_24h.out')
+    parser.add_argument('--training_output_file', default='')
 
     parser.add_argument('--num_workers', default=2, type=int)
 
@@ -120,6 +120,9 @@ def main(args):
     print(args)
 
     device = torch.device(args.device)
+
+    if args.eval:  # To avoid generating the same images for training and evaluation
+        args.seed *= 2
 
     # fix the seed for reproducibility
     seed = args.seed + utils.get_rank()
@@ -205,7 +208,7 @@ def main(args):
             args.start_epoch = checkpoint['epoch'] + 1
 
     if args.eval:
-        evaluate_toy_setting(model, data_loader_val, device, args)
+        evaluate_toy_setting(model, data_loader_val, criterion, device, args)
         return
 
     # TRAINING ####################################################################################################

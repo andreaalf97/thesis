@@ -57,7 +57,6 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
         # Image values in range 0.0 : 1.0
 
-        # plot_image_with_labels(samples, targets, threshold=False)
         """
         OUTPUTS is a DICT with keys:
             pred_logits --> Tensor of shape [batch_size, 100, 21]
@@ -66,8 +65,6 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
                 Each aux_output[i] is again a DICT with keys ['pred_logits', 'pred_boxes']
         """
         outputs = model(samples)
-
-        # plot_prediction(samples, outputs)
 
         """
         LOSS_DICT is a dict with keys (all tensors of dim 1 or single items)
@@ -79,6 +76,9 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
             loss_ce_4 loss_bbox_4 loss_giou_4 cardinality_error_4
         """
         loss_dict = criterion(outputs, targets)
+
+        print("#############")
+        print("LOSS DICT:", loss_dict)
 
         weight_dict = criterion.weight_dict
         losses = sum(loss_dict[k] * weight_dict[k] for k in loss_dict.keys() if k in weight_dict)
@@ -92,6 +92,10 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         losses_reduced_scaled = sum(loss_dict_reduced_scaled.values())
 
         loss_value = losses_reduced_scaled.item()
+
+        print("LOSS DICT REDUCED:", loss_dict_reduced)
+        print("#############")
+        exit(-1)
 
         if not math.isfinite(loss_value):
             print("Loss is {}, stopping training".format(loss_value))
@@ -244,20 +248,32 @@ def plot_image_with_labels(samples: torch.Tensor, targets: torch.Tensor, num_sam
 
 
 @torch.no_grad()
-def plot_prediction(samples: utils.NestedTensor, outputs: dict):
+def plot_prediction(samples: utils.NestedTensor, outputs: dict, targets: tuple):
 
     logits_batch = outputs["pred_logits"]  # [batch_size, 100, 21]
     coords_batch = outputs["pred_boxes"]  # [batch_size, 100, 8]
 
     colors = [
-        "blue",
-        "red",
-        "orange",
-        "green",
-        "yellow"
+        "tab:blue",
+        "tab:red",
+        "tab:orange",
+        "tab:green",
+        "tab:brown",
+        "tab:purple",
+        "tab:pink",
+        "tab:olive",
+        "tab:cyan",
+        "lime",
+        "navy",
+        "lightgray",
+        "gold",
+        "chocolate",
+        "palegreen"
     ]
 
-    for image, logits, coords in zip(samples.tensors, logits_batch, coords_batch):
+    colors = colors * 5
+
+    for image, logits, coords, target in zip(samples.tensors, logits_batch, coords_batch, targets):
 
         num_predictions = 0
 
@@ -265,7 +281,9 @@ def plot_prediction(samples: utils.NestedTensor, outputs: dict):
         plt.imshow(image.cpu().permute(1, 2, 0))
 
         for logit, coord, color in zip(logits, coords, colors):
-            _, index = torch.max(logit, 0)
+
+            logit = torch.softmax(logit, 0)
+            confidence, index = torch.max(logit, 0)
 
             if index.item() != 1:
                 num_predictions += 1
@@ -284,8 +302,9 @@ def plot_prediction(samples: utils.NestedTensor, outputs: dict):
                 plt.scatter(tr_x.cpu() * w, tr_y.cpu() * h, c=color)
                 plt.scatter(br_x.cpu() * w, br_y.cpu() * h, c=color)
 
+                plt.text(tl_x*w, tl_y*h, str(confidence.item())[:5]+"%", color=color)
 
-        print("NUMBER OF PREDICTIONS:", num_predictions)
+        plt.title(f"FOUND {num_predictions} GATES WITH A TOTAL OF {len(target['labels'])}")
         plt.show()
 
 
@@ -337,7 +356,7 @@ def show_coco_sample(samples, targets, s_num=0):
 
 
 @torch.no_grad()
-def evaluate_toy_setting(model, data_loader_val, device, args):
+def evaluate_toy_setting(model, data_loader_val, criterion, device, args):
     assert args.pretrained_model != '', "Give path to pretrained model with --pretrained_model"
 
     if args.training_output_file != '':
@@ -398,22 +417,27 @@ def evaluate_toy_setting(model, data_loader_val, device, args):
         state_dict = torch.load(args.pretrained_model)
     model.load_state_dict(state_dict)
     model.eval()
+    criterion.eval()
 
-    total_iterations = 1
-    i = 0
     for samples, targets in data_loader_val:
-
-        if i >= total_iterations:
-            break
-
-        i += 1
 
         samples = samples.to(device)
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
 
         outputs = model(samples)
+        outputs = {k: v for k, v in outputs.items() if k != 'aux_outputs'}
 
-        plot_prediction(samples, outputs)
+        loss_dict = criterion(outputs, targets, eval=True)
+
+        print("#############")
+        print("LOSS DICT:\n" + "\n".join([str(k) + ": " + str(loss_dict[k]) for k in loss_dict]))
+
+        weight_dict = criterion.weight_dict
+        losses = sum(loss_dict[k] * weight_dict[k] for k in loss_dict.keys() if k in weight_dict)
+
+        plot_prediction(samples, outputs, targets)
+
+        break
 
     # test_stats, coco_evaluator = evaluate(model, criterion, postprocessors,
     #                                       data_loader_val, base_ds, device, args.output_dir)

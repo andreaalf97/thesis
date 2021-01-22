@@ -217,15 +217,15 @@ class SetCriterion(nn.Module):
         assert loss in loss_map, f'do you really want to compute {loss} loss?'
         return loss_map[loss](outputs, targets, indices, num_boxes, **kwargs)
 
-    def forward(self, outputs, targets):
+    def forward(self, outputs, targets, eval=False):
         """ This performs the loss computation.
         Parameters:
              outputs: dict of tensors, see the output specification of the model for the format
              targets: list of dicts, such that len(targets) == batch_size.
                       The expected keys in each dict depends on the losses applied, see each loss' doc
         OUTPUTS is a DICT with keys:
-            pred_logits --> Tensor of shape [batch_size, 100, 21]
-            pred_boxes --> Tensor of shape [batch_size, 100, 21]
+            pred_logits --> Tensor of shape [batch_size, 10, 2]
+            pred_boxes --> Tensor of shape [batch_size, 10, 8]
             aux_outputs --> List of length 5 (repetitions of decoder - 1)
                 Each aux_output[i] is again a DICT with keys ['pred_logits', 'pred_boxes']
         TARGETS: is a tuple of length BATCH_SIZE
