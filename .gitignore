@@ -2,7 +2,6 @@ misc/*.mp4
 .idea
 code/image_gen/samples
 code/image_gen/backgrounds
-google-research/
 code/detr/test_tensors
 
 .nfs*
@@ -23,5 +22,4 @@ experiment-*
 not_tracked_dir/
 .vscode
 detr/coco_dataset/
-.idea/
 detr/tmp/
