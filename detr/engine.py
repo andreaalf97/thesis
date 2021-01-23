@@ -489,6 +489,7 @@ def evaluate_toy_setting(model, data_loader_val, criterion, device, args):
 
         # plot_prediction(samples, outputs, targets)
 
+    print_confusion_matrix(confusion_matrix)
 
     # test_stats, coco_evaluator = evaluate(model, criterion, postprocessors,
     #                                       data_loader_val, base_ds, device, args.output_dir)
