@@ -77,9 +77,6 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         """
         loss_dict = criterion(outputs, targets)
 
-        print("#############")
-        print("LOSS DICT:", loss_dict)
-
         weight_dict = criterion.weight_dict
         losses = sum(loss_dict[k] * weight_dict[k] for k in loss_dict.keys() if k in weight_dict)
 
@@ -92,10 +89,6 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         losses_reduced_scaled = sum(loss_dict_reduced_scaled.values())
 
         loss_value = losses_reduced_scaled.item()
-
-        print("LOSS DICT REDUCED:", loss_dict_reduced)
-        print("#############")
-        exit(-1)
 
         if not math.isfinite(loss_value):
             print("Loss is {}, stopping training".format(loss_value))
