@@ -217,7 +217,7 @@ class SetCriterion(nn.Module):
         assert loss in loss_map, f'do you really want to compute {loss} loss?'
         return loss_map[loss](outputs, targets, indices, num_boxes, **kwargs)
 
-    def forward(self, outputs, targets, eval=False):
+    def forward(self, outputs, targets):
         """ This performs the loss computation.
         Parameters:
              outputs: dict of tensors, see the output specification of the model for the format
@@ -276,6 +276,9 @@ class SetCriterion(nn.Module):
 
         return losses
 
+    def get_indices(self, outputs, targets):
+        assert "aux_outputs" not in outputs, "This function should receive only the output of the last decoder layer"
+        return self.matcher(outputs, targets)
 
 class PostProcess(nn.Module):
     """ This module converts the model's output into the format expected by the coco api"""

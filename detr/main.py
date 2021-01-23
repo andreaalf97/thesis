@@ -121,11 +121,12 @@ def main(args):
 
     device = torch.device(args.device)
 
-    if args.eval:  # To avoid generating the same images for training and evaluation
-        args.seed *= 2
-
     # fix the seed for reproducibility
     seed = args.seed + utils.get_rank()
+
+    if args.eval:  # To avoid generating the same images for training and evaluation
+        seed = seed * 2
+
     torch.manual_seed(seed)
     np.random.seed(seed)
     random.seed(seed)

@@ -355,6 +355,17 @@ def show_coco_sample(samples, targets, s_num=0):
     plt.show()
 
 
+def print_confusion_matrix(matrix: dict):
+    assert 'T' in matrix and 'F' in matrix
+    assert 'T' in matrix['T'] and 'F' in matrix['T']
+    assert 'T' in matrix['F'] and 'F' in matrix['F']
+
+    print("__CONF___MATRIX__")
+    print("x\tT\tF")
+    print(f"T\t{matrix['T']['T']}\t{matrix['T']['F']}")
+    print(f"F\t{matrix['F']['T']}\t{matrix['F']['F']}")
+    print("-----------------")
+
 @torch.no_grad()
 def evaluate_toy_setting(model, data_loader_val, criterion, device, args):
     assert args.pretrained_model != '', "Give path to pretrained model with --pretrained_model"
@@ -419,7 +430,21 @@ def evaluate_toy_setting(model, data_loader_val, criterion, device, args):
     model.eval()
     criterion.eval()
 
-    for samples, targets in data_loader_val:
+    confusion_matrix = {
+        'T': {
+            'T': 0,
+            'F': 0
+        },
+        'F': {
+            'T': 0,
+            'F': 0
+        }
+    }
+
+    coord_loss_sum = 0
+    num_loss_checks = 0
+
+    for iteration, (samples, targets) in enumerate(data_loader_val):  # For one epoch
 
         samples = samples.to(device)
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
@@ -427,17 +452,43 @@ def evaluate_toy_setting(model, data_loader_val, criterion, device, args):
         outputs = model(samples)
         outputs = {k: v for k, v in outputs.items() if k != 'aux_outputs'}
 
-        loss_dict = criterion(outputs, targets, eval=True)
+        indices = criterion.get_indices(outputs, targets)
 
-        print("#############")
-        print("LOSS DICT:\n" + "\n".join([str(k) + ": " + str(loss_dict[k]) for k in loss_dict]))
+        for pred_logits, pred_boxes, target, idx in zip(outputs["pred_logits"], outputs["pred_boxes"], targets, indices):
 
-        weight_dict = criterion.weight_dict
-        losses = sum(loss_dict[k] * weight_dict[k] for k in loss_dict.keys() if k in weight_dict)
+            real_boxes = target['boxes']
+            idx = (idx[0].tolist(), idx[1].tolist())
 
-        plot_prediction(samples, outputs, targets)
+            for i, (pred_logit, pred_box) in enumerate(zip(pred_logits, pred_boxes)):
+                _, pred_class = torch.max(pred_logit, 0)
 
-        break
+                if i in idx[0]:  # Matched with a gate
+                    if pred_class == 0:
+                        # print("True positive")
+                        confusion_matrix['T']['T'] += 1
+                        coord_loss_sum += torch.cdist(
+                            torch.unsqueeze(pred_box, 0),
+                            torch.unsqueeze(real_boxes[idx[1][idx[0].index(i)]], 0),
+                            p=1
+                        ).item()
+                        # print("LOSS", l)
+                        num_loss_checks += 1
+                    else:
+                        # print("False negative")
+                        confusion_matrix['F']['F'] += 1
+                else:  # Not matched with a gate
+                    if pred_class == 0:
+                        # print("False positive")
+                        confusion_matrix['F']['T'] += 1
+                    else:
+                        # print("True negative")
+                        confusion_matrix['T']['F'] += 1
+
+        if iteration % 20 == 0:
+            print(f"[EVAL] Iteration {iteration} of {len(data_loader_val)}")
+
+        # plot_prediction(samples, outputs, targets)
+
 
     # test_stats, coco_evaluator = evaluate(model, criterion, postprocessors,
     #                                       data_loader_val, base_ds, device, args.output_dir)
