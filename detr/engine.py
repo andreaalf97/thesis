@@ -360,15 +360,31 @@ def print_confusion_matrix(matrix: dict):
     assert 'T' in matrix['T'] and 'F' in matrix['T']
     assert 'T' in matrix['F'] and 'F' in matrix['F']
 
+    TP = matrix['T']['T']
+    TN = matrix['T']['F']
+    FP = matrix['F']['T']
+    FN = matrix['F']['F']
+
     print("__CONF___MATRIX__")
     print("x\tT\tF")
-    print(f"T\t{matrix['T']['T']}\t{matrix['T']['F']}")
-    print(f"F\t{matrix['F']['T']}\t{matrix['F']['F']}")
+    print(f"T\t{TP}\t{FP}")
+    print(f"F\t{FN}\t{TN}")
     print("-----------------")
+
+    precision = (TP) / (TP + FP)
+    recall = (TP) / (TP + FN)
+    f1 = 2 * (precision * recall) / (precision + recall)
+
+    print("PRECISION: %.4f (how many are detections are actually gates" % precision)
+    print("RECALL: %.4f (how many are positive" % recall)
+    print("F1 SCORE: %.4f" % f1)
 
 @torch.no_grad()
 def evaluate_toy_setting(model, data_loader_val, criterion, device, args):
     assert args.pretrained_model != '', "Give path to pretrained model with --pretrained_model"
+
+    print("######################")
+    print("EVALUATION")
 
     if args.training_output_file != '':
         with open(args.training_output_file, 'r') as file:
@@ -490,6 +506,9 @@ def evaluate_toy_setting(model, data_loader_val, criterion, device, args):
         # plot_prediction(samples, outputs, targets)
 
     print_confusion_matrix(confusion_matrix)
+
+    print("COMPLETED EVALUATION")
+    print("######################")
 
     # test_stats, coco_evaluator = evaluate(model, criterion, postprocessors,
     #                                       data_loader_val, base_ds, device, args.output_dir)
