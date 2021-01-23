@@ -368,8 +368,8 @@ def print_confusion_matrix(matrix: dict):
     recall = (TP) / (TP + FN)
     f1 = 2 * (precision * recall) / (precision + recall)
 
-    print("PRECISION: %.4f (how many are detections are actually gates" % precision)
-    print("RECALL: %.4f (how many are positive" % recall)
+    print("PRECISION: %.4f" % precision)
+    print("RECALL: %.4f" % recall)
     print("F1 SCORE: %.4f" % f1)
 
 @torch.no_grad()
@@ -453,6 +453,8 @@ def evaluate_toy_setting(model, data_loader_val, criterion, device, args):
     coord_loss_sum = 0
     num_loss_checks = 0
 
+    len_data = len(data_loader_val)
+
     for iteration, (samples, targets) in enumerate(data_loader_val):  # For one epoch
 
         samples = samples.to(device)
@@ -494,7 +496,7 @@ def evaluate_toy_setting(model, data_loader_val, criterion, device, args):
                         confusion_matrix['T']['F'] += 1
 
         if iteration % 20 == 0:
-            print(f"[EVAL] Iteration {iteration} of {len(data_loader_val)}")
+            print(f"[EVAL] Iteration {iteration} of {len_data}")
 
         # plot_prediction(samples, outputs, targets)
 
