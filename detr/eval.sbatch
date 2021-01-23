@@ -3,13 +3,11 @@
 # You can control the resources and scheduling with '#SBATCH' settings
 # (see 'man sbatch' for more information on setting these parameters)
 
-#SBATCH --mail-type=END
-
 # The default partition is the 'general' partition
 #SBATCH --partition=general
 
 # The default Quality of Service is the 'short' QoS (maximum run time: 4 hours)
-#SBATCH --qos=long
+#SBATCH --qos=short
 
 # The default run (wall-clock) time is 1 minute
 #SBATCH --time=0:03:00
