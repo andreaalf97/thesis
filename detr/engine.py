@@ -368,9 +368,9 @@ def print_confusion_matrix(matrix: dict):
     recall = (TP) / (TP + FN)
     f1 = 2 * (precision * recall) / (precision + recall)
 
-    print("PRECISION: %.4f" % precision)
-    print("RECALL: %.4f" % recall)
-    print("F1 SCORE: %.4f" % f1)
+    print("PRECISION: %.8f" % precision)
+    print("RECALL: %.8f" % recall)
+    print("F1 SCORE: %.8f" % f1)
 
 @torch.no_grad()
 def evaluate_toy_setting(model, data_loader_val, criterion, device, args):
@@ -501,7 +501,7 @@ def evaluate_toy_setting(model, data_loader_val, criterion, device, args):
         # plot_prediction(samples, outputs, targets)
 
     print_confusion_matrix(confusion_matrix)
-    print("AVERAGE L1 DIST: %.6f" % (float(coord_loss_sum)/num_loss_checks))
+    print("AVERAGE L1 DIST: %.8f" % (float(coord_loss_sum)/num_loss_checks))
 
     print("COMPLETED EVALUATION")
     print("######################")
