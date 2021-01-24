@@ -84,8 +84,8 @@ def get_args_parser():
     parser.add_argument('--coco_panoptic_path', type=str)
     parser.add_argument('--remove_difficult', action='store_true')
 
-    parser.add_argument('--output_dir', default='checkpoints',
-                        help='path where to save, empty for no saving')
+    parser.add_argument('--output_dir', default='',
+                        help='path where to save, empty for no saving')  # default 'checkpoints'
     parser.add_argument('--device', default='cuda',
                         help='device to use for training / testing')
     parser.add_argument('--seed', default=43, type=int)  # default 43
