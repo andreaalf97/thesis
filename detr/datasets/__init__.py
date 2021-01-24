@@ -24,5 +24,8 @@ def build_dataset(image_set, args):
         from .coco_panoptic import build as build_coco_panoptic
         return build_coco_panoptic(image_set, args)
     if args.dataset_file == 'toy_setting':
-        return TSDataset(256, 256)
+        if int(args.num_gates) == -1:
+            return TSDataset(256, 256)
+        else:
+            return TSDataset(256, 256, num_gates=int(args.num_gates), rand_gate_number=False)
     raise ValueError(f'dataset {args.dataset_file} not supported')
