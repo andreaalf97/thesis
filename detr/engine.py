@@ -501,6 +501,7 @@ def evaluate_toy_setting(model, data_loader_val, criterion, device, args):
         # plot_prediction(samples, outputs, targets)
 
     print_confusion_matrix(confusion_matrix)
+    print("AVERAGE L1 DIST: %.6f" % (float(coord_loss_sum)/num_loss_checks))
 
     print("COMPLETED EVALUATION")
     print("######################")
