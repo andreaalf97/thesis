@@ -372,6 +372,25 @@ def print_confusion_matrix(matrix: dict):
     print("RECALL: %.8f" % recall)
     print("F1 SCORE: %.8f" % f1)
 
+
+def valid_box(box: torch.Tensor) -> bool:
+    b = box.tolist()
+
+    valid_bl = 0 < b[0] < 1 and 0 < b[1] < 1
+    if valid_bl:
+        return True
+    valid_tl = 0 < b[2] < 1 and 0 < b[3] < 1
+    if valid_tl:
+        return True
+    valid_tr = 0 < b[4] < 1 and 0 < b[5] < 1
+    if valid_tr:
+        return True
+    valid_br = 0 < b[6] < 1 and 0 < b[7] < 1
+    if valid_br:
+        return True
+
+    return False
+
 @torch.no_grad()
 def evaluate_toy_setting(model, data_loader_val, criterion, device, args):
     assert args.pretrained_model != '', "Give path to pretrained model with --pretrained_model"
@@ -452,6 +471,7 @@ def evaluate_toy_setting(model, data_loader_val, criterion, device, args):
 
     coord_loss_sum = 0
     num_loss_checks = 0
+    invalid_gates = 0
 
     len_data = len(data_loader_val)
 
@@ -459,6 +479,8 @@ def evaluate_toy_setting(model, data_loader_val, criterion, device, args):
 
         samples = samples.to(device)
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
+
+
 
         outputs = model(samples)
         outputs = {k: v for k, v in outputs.items() if k != 'aux_outputs'}
@@ -474,12 +496,17 @@ def evaluate_toy_setting(model, data_loader_val, criterion, device, args):
                 _, pred_class = torch.max(pred_logit, 0)
 
                 if i in idx[0]:  # Matched with a gate
+                    real_box = real_boxes[idx[1][idx[0].index(i)]]
+                    if not valid_box(real_box):
+                        invalid_gates += 1
+                        continue
+
                     if pred_class == 0:
                         # print("True positive")
                         confusion_matrix['T']['T'] += 1
                         coord_loss_sum += torch.cdist(
                             torch.unsqueeze(pred_box, 0),
-                            torch.unsqueeze(real_boxes[idx[1][idx[0].index(i)]], 0),
+                            torch.unsqueeze(real_box, 0),
                             p=1
                         ).item()
                         # print("LOSS", l)
@@ -502,6 +529,7 @@ def evaluate_toy_setting(model, data_loader_val, criterion, device, args):
 
     print_confusion_matrix(confusion_matrix)
     print("AVERAGE L1 DIST: %.8f" % (float(coord_loss_sum)/num_loss_checks))
+    print("INVALID GATES:", invalid_gates)
 
     print("COMPLETED EVALUATION")
     print("######################")
