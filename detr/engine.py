@@ -472,6 +472,9 @@ def evaluate_toy_setting(model, data_loader_val, criterion, device, args):
     coord_loss_sum = 0
     num_loss_checks = 0
     invalid_gates = 0
+    wrong_coord_gates = 0
+
+    threshold = 0.07
 
     len_data = len(data_loader_val)
 
@@ -479,8 +482,6 @@ def evaluate_toy_setting(model, data_loader_val, criterion, device, args):
 
         samples = samples.to(device)
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
-
-
 
         outputs = model(samples)
         outputs = {k: v for k, v in outputs.items() if k != 'aux_outputs'}
@@ -503,12 +504,16 @@ def evaluate_toy_setting(model, data_loader_val, criterion, device, args):
 
                     if pred_class == 0:
                         # print("True positive")
-                        confusion_matrix['T']['T'] += 1
-                        coord_loss_sum += torch.cdist(
+                        dist = torch.cdist(
                             torch.unsqueeze(pred_box, 0),
                             torch.unsqueeze(real_box, 0),
                             p=1
                         ).item()
+                        if dist > threshold:
+                            wrong_coord_gates += 1
+                            continue
+                        coord_loss_sum += dist
+                        confusion_matrix['T']['T'] += 1
                         # print("LOSS", l)
                         num_loss_checks += 1
                     else:
@@ -530,6 +535,7 @@ def evaluate_toy_setting(model, data_loader_val, criterion, device, args):
     print_confusion_matrix(confusion_matrix)
     print("AVERAGE L1 DIST: %.8f" % (float(coord_loss_sum)/num_loss_checks))
     print("INVALID GATES:", invalid_gates)
+    print("WRONG COORD GATES", wrong_coord_gates)
 
     print("COMPLETED EVALUATION")
     print("######################")
