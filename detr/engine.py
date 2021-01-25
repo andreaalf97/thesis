@@ -511,6 +511,7 @@ def evaluate_toy_setting(model, data_loader_val, criterion, device, args):
                         ).item()
                         if dist > threshold:
                             wrong_coord_gates += 1
+                            confusion_matrix['F']['T'] += 1
                             continue
                         coord_loss_sum += dist
                         confusion_matrix['T']['T'] += 1
