@@ -556,7 +556,7 @@ def evaluate_toy_setting(model, data_loader_val, criterion, device, args):
 
         indices = criterion.get_indices(outputs, targets)
 
-        for pred_logits, pred_boxes, target, idx, sample in zip(outputs["pred_logits"], outputs["pred_boxes"], targets, indices, samples.tensors):
+        for pred_logits, pred_boxes, target, idx in zip(outputs["pred_logits"], outputs["pred_boxes"], targets, indices):
 
             real_boxes = target['boxes']
             idx = (idx[0].tolist(), idx[1].tolist())
@@ -573,12 +573,15 @@ def evaluate_toy_setting(model, data_loader_val, criterion, device, args):
                     real_box = torch.clamp(real_box, 0, 1)
 
                     if pred_class == 0:
+
                         dist = torch.cdist(
                             torch.unsqueeze(pred_box, 0),
                             torch.unsqueeze(real_box, 0),
                             p=1
                         ).item()
-                        if (dist/8) > (threshold * longest_edge(real_box)) and longest_edge(real_box) > 0.05:  # If the average distance of two coordinates is bigger than 5% of the longest edge
+
+                        # If the average distance of two coordinates is bigger than 5% of the longest edge
+                        if (dist/8) > (threshold * longest_edge(real_box)) and longest_edge(real_box) > 0.05:
                             wrong_coord_gates += 1
                             confusion_matrix['F']['T'] += 1
                             continue
