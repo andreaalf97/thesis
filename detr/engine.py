@@ -301,6 +301,55 @@ def plot_prediction(samples: utils.NestedTensor, outputs: dict, targets: tuple):
         plt.show()
 
 
+@torch.no_grad()
+def plot_single_sample(sample: torch.Tensor, prediction_box: torch.Tensor, gt_box: torch.Tensor, title="") -> None:
+
+    plt.imshow(sample.cpu().permute(1, 2, 0))
+    h = list(sample.shape)[1]
+    w = list(sample.shape)[2]
+
+    x_s = [
+        prediction_box[0] * w,
+        prediction_box[2] * w,
+        prediction_box[4] * w,
+        prediction_box[6] * w
+    ]
+
+    y_s = [
+        prediction_box[1] * h,
+        prediction_box[3] * h,
+        prediction_box[5] * h,
+        prediction_box[7] * h
+    ]
+
+    x_s = [x.item() for x in x_s]
+    y_s = [x.item() for x in y_s]
+
+    plt.scatter(x_s, y_s, c='red')
+
+    x_s = [
+        gt_box[0] * w,
+        gt_box[2] * w,
+        gt_box[4] * w,
+        gt_box[6] * w
+    ]
+
+    y_s = [
+        gt_box[1] * h,
+        gt_box[3] * h,
+        gt_box[5] * h,
+        gt_box[7] * h
+    ]
+
+    x_s = [x.item() for x in x_s]
+    y_s = [x.item() for x in y_s]
+
+    plt.scatter(x_s, y_s, c='blue')
+
+    plt.title(title)
+    plt.show()
+
+
 def show_coco_sample(samples, targets, s_num=0):
     img = samples.tensors[s_num]
     img = (img - torch.min(img)) / (torch.max(img) - torch.min(img))
@@ -391,6 +440,25 @@ def valid_box(box: torch.Tensor) -> bool:
 
     return False
 
+
+@torch.no_grad()
+def longest_edge(gt_box: torch.Tensor) -> float:
+
+    box = gt_box.tolist()
+
+    bl = box[0], box[1]
+    tl = box[2], box[3]
+    tr = box[4], box[5]
+    br = box[6], box[7]
+
+    b = math.sqrt((bl[0] - br[0])**2 + (bl[1] - br[1])**2)
+    l = math.sqrt((bl[0] - tl[0])**2 + (bl[1] - tl[1])**2)
+    t = math.sqrt((tl[0] - tr[0])**2 + (tl[1] - tr[1])**2)
+    r = math.sqrt((br[0] - tr[0])**2 + (br[1] - tr[1])**2)
+
+    return max([b, l, t, r])
+
+
 @torch.no_grad()
 def evaluate_toy_setting(model, data_loader_val, criterion, device, args):
     assert args.pretrained_model != '', "Give path to pretrained model with --pretrained_model"
@@ -474,7 +542,7 @@ def evaluate_toy_setting(model, data_loader_val, criterion, device, args):
     invalid_gates = 0
     wrong_coord_gates = 0
 
-    threshold = 0.07
+    threshold = 0.1
 
     len_data = len(data_loader_val)
 
@@ -488,7 +556,7 @@ def evaluate_toy_setting(model, data_loader_val, criterion, device, args):
 
         indices = criterion.get_indices(outputs, targets)
 
-        for pred_logits, pred_boxes, target, idx in zip(outputs["pred_logits"], outputs["pred_boxes"], targets, indices):
+        for pred_logits, pred_boxes, target, idx, sample in zip(outputs["pred_logits"], outputs["pred_boxes"], targets, indices, samples.tensors):
 
             real_boxes = target['boxes']
             idx = (idx[0].tolist(), idx[1].tolist())
@@ -502,30 +570,27 @@ def evaluate_toy_setting(model, data_loader_val, criterion, device, args):
                         invalid_gates += 1
                         continue
 
+                    real_box = torch.clamp(real_box, 0, 1)
+
                     if pred_class == 0:
-                        # print("True positive")
                         dist = torch.cdist(
                             torch.unsqueeze(pred_box, 0),
                             torch.unsqueeze(real_box, 0),
                             p=1
                         ).item()
-                        if dist > threshold:
+                        if (dist/8) > (threshold * longest_edge(real_box)) and longest_edge(real_box) > 0.05:  # If the average distance of two coordinates is bigger than 5% of the longest edge
                             wrong_coord_gates += 1
                             confusion_matrix['F']['T'] += 1
                             continue
                         coord_loss_sum += dist
                         confusion_matrix['T']['T'] += 1
-                        # print("LOSS", l)
                         num_loss_checks += 1
                     else:
-                        # print("False negative")
                         confusion_matrix['F']['F'] += 1
                 else:  # Not matched with a gate
                     if pred_class == 0:
-                        # print("False positive")
                         confusion_matrix['F']['T'] += 1
                     else:
-                        # print("True negative")
                         confusion_matrix['T']['F'] += 1
 
         if iteration % 20 == 0:
