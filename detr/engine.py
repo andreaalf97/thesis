@@ -541,6 +541,7 @@ def evaluate_toy_setting(model, data_loader_val, criterion, device, args):
     num_loss_checks = 0
     invalid_gates = 0
     wrong_coord_gates = 0
+    num_predictions = 0
 
     threshold = 0.1
 
@@ -562,6 +563,7 @@ def evaluate_toy_setting(model, data_loader_val, criterion, device, args):
             idx = (idx[0].tolist(), idx[1].tolist())
 
             for i, (pred_logit, pred_box) in enumerate(zip(pred_logits, pred_boxes)):
+                num_predictions += 1
                 _, pred_class = torch.max(pred_logit, 0)
 
                 if i in idx[0]:  # Matched with a gate
@@ -602,9 +604,10 @@ def evaluate_toy_setting(model, data_loader_val, criterion, device, args):
         # plot_prediction(samples, outputs, targets)
 
     print_confusion_matrix(confusion_matrix)
+    print(f"OUT OF {num_predictions} PREDICTIONS")
     print("AVERAGE L1 DIST: %.8f" % (float(coord_loss_sum)/num_loss_checks))
     print("INVALID GATES:", invalid_gates)
-    print("WRONG COORD GATES", wrong_coord_gates)
+    print("WRONG COORD GATES (these are also false positives)", wrong_coord_gates)
 
     print("COMPLETED EVALUATION")
     print("######################")
