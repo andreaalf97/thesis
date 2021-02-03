@@ -325,7 +325,7 @@ def plot_single_sample(sample: torch.Tensor, prediction_box: torch.Tensor, gt_bo
     x_s = [x.item() for x in x_s]
     y_s = [x.item() for x in y_s]
 
-    plt.scatter(x_s, y_s, c='red')
+    plt.scatter(x_s, y_s, c='red', label="Prediction")
 
     x_s = [
         gt_box[0] * w,
@@ -344,9 +344,10 @@ def plot_single_sample(sample: torch.Tensor, prediction_box: torch.Tensor, gt_bo
     x_s = [x.item() for x in x_s]
     y_s = [x.item() for x in y_s]
 
-    plt.scatter(x_s, y_s, c='blue')
+    plt.scatter(x_s, y_s, c='blue', label="Grund truth")
 
     plt.title(title)
+    plt.legend()
     plt.show()
 
 
@@ -543,7 +544,7 @@ def evaluate_toy_setting(model, data_loader_val, criterion, device, args):
     wrong_coord_gates = 0
     num_predictions = 0
 
-    threshold = 0.1
+    threshold = 0.08
 
     len_data = len(data_loader_val)
 
@@ -554,6 +555,8 @@ def evaluate_toy_setting(model, data_loader_val, criterion, device, args):
 
         outputs = model(samples)
         outputs = {k: v for k, v in outputs.items() if k != 'aux_outputs'}
+
+        plot_prediction(samples, outputs, targets)
 
         indices = criterion.get_indices(outputs, targets)
 
@@ -583,19 +586,24 @@ def evaluate_toy_setting(model, data_loader_val, criterion, device, args):
                         ).item()
 
                         # If the average distance of two coordinates is bigger than 5% of the longest edge
-                        if (dist/8) > (threshold * longest_edge(real_box)) and longest_edge(real_box) > 0.05:
+                        if (dist/8) > (threshold * longest_edge(real_box)):# and longest_edge(real_box) > 0.05:
                             wrong_coord_gates += 1
+                            # plot_single_sample(sample, pred_box, real_box, title=f"False positive (distance): avg {dist/8}, L.E.: {longest_edge(real_box)}")
                             confusion_matrix['F']['T'] += 1
                             continue
                         coord_loss_sum += dist
+                        # plot_single_sample(sample, pred_box, real_box, title="True positive")
                         confusion_matrix['T']['T'] += 1
                         num_loss_checks += 1
                     else:
+                        # plot_single_sample(sample, pred_box, real_box, title="False negative")
                         confusion_matrix['F']['F'] += 1
                 else:  # Not matched with a gate
                     if pred_class == 0:
+                        # plot_single_sample(sample, pred_box, real_box, title="False positive (matching)")
                         confusion_matrix['F']['T'] += 1
                     else:
+                        # plot_single_sample(sample, pred_box, real_box, title="True negative")
                         confusion_matrix['T']['F'] += 1
 
         if iteration % 20 == 0:
