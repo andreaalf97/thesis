@@ -58,6 +58,12 @@ class DETR(nn.Module):
         """
         if isinstance(samples, (list, torch.Tensor)):
             samples = nested_tensor_from_tensor_list(samples)
+
+        """
+            Samples is a NestedTensor of dim [batch_size, 3, 256, 256]
+            Features is a list of len 1 of NestedTensors of shape [2, torch.Size([2048, 8, 8])]
+            Pos is a list of lenght 1 of a tensor of shape [2, 256, 8, 8]
+        """
         features, pos = self.backbone(samples)
 
         src, mask = features[-1].decompose()
