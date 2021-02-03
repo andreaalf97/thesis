@@ -16,6 +16,7 @@ from datasets.panoptic_eval import PanopticEvaluator
 import matplotlib.pyplot as plt
 from scipy.signal import savgol_filter
 import numpy as np
+from shapely.geometry import box, Polygon
 
 
 def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
@@ -442,6 +443,43 @@ def valid_box(box: torch.Tensor) -> bool:
     return False
 
 
+def iou(prediction: torch.Tensor, gt: torch.Tensor) -> float:
+
+    pred_bl = [prediction[0].item(), prediction[1].item()]
+    pred_tl = [prediction[2].item(), prediction[3].item()]
+    pred_tr = [prediction[4].item(), prediction[5].item()]
+    pred_br = [prediction[6].item(), prediction[7].item()]
+
+    gt_bl = [gt[0].item(), gt[1].item()]
+    gt_tl = [gt[2].item(), gt[3].item()]
+    gt_tr = [gt[4].item(), gt[5].item()]
+    gt_br = [gt[6].item(), gt[7].item()]
+
+    try:
+        pred_poly = Polygon([
+            pred_bl,
+            pred_tl,
+            pred_tr,
+            pred_br
+        ])
+
+        gt_poly = Polygon([
+            gt_bl,
+            gt_tl,
+            gt_tr,
+            gt_br
+        ])
+
+        intersection = pred_poly.intersection(gt_poly).area
+        union = pred_poly.area + gt_poly.area - intersection
+        # union = pred_poly.union(gt_poly).area
+
+        return intersection/union
+    except:
+        print(f"Error with polygons\nPrediction: {prediction}\nGT: {gt}")
+        return 0.0
+
+
 @torch.no_grad()
 def longest_edge(gt_box: torch.Tensor) -> float:
 
@@ -538,13 +576,13 @@ def evaluate_toy_setting(model, data_loader_val, criterion, device, args):
         }
     }
 
-    coord_loss_sum = 0
+    iou_sum = 0
     num_loss_checks = 0
     invalid_gates = 0
     wrong_coord_gates = 0
     num_predictions = 0
 
-    threshold = 0.08
+    iou_treshold = float(args.iou_treshold)
 
     len_data = len(data_loader_val)
 
@@ -556,11 +594,11 @@ def evaluate_toy_setting(model, data_loader_val, criterion, device, args):
         outputs = model(samples)
         outputs = {k: v for k, v in outputs.items() if k != 'aux_outputs'}
 
-        plot_prediction(samples, outputs, targets)
+        # plot_prediction(samples, outputs, targets)
 
         indices = criterion.get_indices(outputs, targets)
 
-        for pred_logits, pred_boxes, target, idx in zip(outputs["pred_logits"], outputs["pred_boxes"], targets, indices):
+        for pred_logits, pred_boxes, target, idx, sample in zip(outputs["pred_logits"], outputs["pred_boxes"], targets, indices, samples.tensors):
 
             real_boxes = target['boxes']
             idx = (idx[0].tolist(), idx[1].tolist())
@@ -579,19 +617,15 @@ def evaluate_toy_setting(model, data_loader_val, criterion, device, args):
 
                     if pred_class == 0:
 
-                        dist = torch.cdist(
-                            torch.unsqueeze(pred_box, 0),
-                            torch.unsqueeze(real_box, 0),
-                            p=1
-                        ).item()
+                        iou_score = iou(pred_box, real_box)
 
-                        # If the average distance of two coordinates is bigger than 5% of the longest edge
-                        if (dist/8) > (threshold * longest_edge(real_box)):# and longest_edge(real_box) > 0.05:
+                        # If the IOU score is smaller than the threshold, it's a wrong prediction
+                        if iou_score < iou_treshold and longest_edge(real_box) > 0.04:
                             wrong_coord_gates += 1
-                            # plot_single_sample(sample, pred_box, real_box, title=f"False positive (distance): avg {dist/8}, L.E.: {longest_edge(real_box)}")
+                            # plot_single_sample(sample, pred_box, real_box, title=f"False positive (distance): iou {iou_score}")
                             confusion_matrix['F']['T'] += 1
                             continue
-                        coord_loss_sum += dist
+                        iou_sum += iou_score
                         # plot_single_sample(sample, pred_box, real_box, title="True positive")
                         confusion_matrix['T']['T'] += 1
                         num_loss_checks += 1
@@ -613,7 +647,7 @@ def evaluate_toy_setting(model, data_loader_val, criterion, device, args):
 
     print_confusion_matrix(confusion_matrix)
     print(f"OUT OF {num_predictions} PREDICTIONS")
-    print("AVERAGE L1 DIST: %.8f" % (float(coord_loss_sum)/num_loss_checks))
+    print("AVERAGE IOU for correct predictions: %.8f" % (float(iou_sum)/num_loss_checks))
     print("INVALID GATES:", invalid_gates)
     print("WRONG COORD GATES (these are also false positives)", wrong_coord_gates)
 
