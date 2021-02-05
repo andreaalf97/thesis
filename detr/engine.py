@@ -297,7 +297,7 @@ def plot_prediction(samples: utils.NestedTensor, outputs: dict, targets: tuple):
                 plt.scatter(tr_x.cpu() * w, tr_y.cpu() * h, c=color)
                 plt.scatter(br_x.cpu() * w, br_y.cpu() * h, c=color)
 
-                plt.text(tl_x*w, tl_y*h, str(confidence.item())[:5]+"%", color=color)
+                plt.text(tl_x*w, tl_y*h, str(confidence.item()*100)[:5]+"%", color=color)
 
         plt.title(f"FOUND {num_predictions} GATES WITH A TOTAL OF {len(target['labels'])}")
         plt.show()
@@ -492,63 +492,64 @@ def corner_distances(pred_box: torch.Tensor, real_box: torch.Tensor) -> tuple:
 
 
 @torch.no_grad()
+def plot_loss(output_file: str):
+    with open(output_file, 'r') as file:
+
+        epoch_list = []
+        class_err_list = []
+        loss_list = []
+        loss_ce_list = []
+        loss_bbox_list = []
+
+        line = file.readline()
+        while line:
+            if "Epoch:" in line and "Total time: " not in line:
+                epoch = int(line.split("Epoch: [", 1)[1].split("]", 1)[0])
+                epoch_list.append(epoch)
+
+                class_error = float(line.split("class_error: ", 1)[1].split(" loss:", 1)[0])
+                class_err_list.append(class_error)
+
+                loss = float(line.split("loss: ", 1)[1].split(" (", 1)[0])
+                loss_list.append(loss)
+
+                loss_ce = float(line.split("loss_ce: ", 1)[1].split(" (", 1)[0])
+                loss_ce_list.append(loss_ce)
+
+                loss_bbox = float(line.split("loss_bbox: ", 1)[1].split(" (", 1)[0])
+                loss_bbox_list.append(loss_bbox)
+
+            line = file.readline()
+
+        epoch_list = np.array(epoch_list)
+        class_err_list = np.array(class_err_list)
+        loss_list = np.array(loss_list)
+        loss_ce_list = np.array(loss_ce_list)
+        loss_bbox_list = np.array(loss_bbox_list)
+
+        window_size = int(math.floor(len(loss_bbox_list) / 100))
+        print(window_size)
+        if window_size % 2 == 0:
+            window_size += 1
+
+        loss_bbox_list = savgol_filter(loss_bbox_list, window_size, 3)
+
+        plt.plot(range(len(loss_bbox_list)), loss_bbox_list, label="Avg of last 200 values is 0.33999")
+        # plt.plot(range(len(loss_list_b), len(loss_list_b) + len(loss_list_a)), loss_list_a, label="Loss after LR drop")
+
+        plt.title("Coordinates Loss")
+        plt.legend()
+        plt.show()
+
+        return
+
+
+@torch.no_grad()
 def evaluate_toy_setting(model, data_loader_val, criterion, device, args):
     assert args.pretrained_model != '', "Give path to pretrained model with --pretrained_model"
 
     print("######################")
     print("EVALUATION")
-
-    if args.training_output_file != '':
-        with open(args.training_output_file, 'r') as file:
-
-            epoch_list = []
-            class_err_list = []
-            loss_list = []
-            loss_ce_list = []
-            loss_bbox_list = []
-
-            line = file.readline()
-            while line:
-                if "Epoch:" in line and "Total time: " not in line:
-
-                    epoch = int(line.split("Epoch: [", 1)[1].split("]", 1)[0])
-                    epoch_list.append(epoch)
-
-                    class_error = float(line.split("class_error: ", 1)[1].split(" loss:", 1)[0])
-                    class_err_list.append(class_error)
-
-                    loss = float(line.split("loss: ", 1)[1].split(" (", 1)[0])
-                    loss_list.append(loss)
-
-                    loss_ce = float(line.split("loss_ce: ", 1)[1].split(" (", 1)[0])
-                    loss_ce_list.append(loss_ce)
-
-                    loss_bbox = float(line.split("loss_bbox: ", 1)[1].split(" (", 1)[0])
-                    loss_bbox_list.append(loss_bbox)
-
-                line = file.readline()
-
-            epoch_list = np.array(epoch_list)
-            class_err_list = np.array(class_err_list)
-            loss_list = np.array(loss_list)
-            loss_ce_list = np.array(loss_ce_list)
-            loss_bbox_list = np.array(loss_bbox_list)
-
-            window_size = int(math.floor(len(loss_bbox_list) / 100))
-            print(window_size)
-            if window_size % 2 == 0:
-                window_size += 1
-
-            loss_bbox_list = savgol_filter(loss_bbox_list, window_size, 3)
-
-            plt.plot(range(len(loss_bbox_list)), loss_bbox_list, label="Avg of last 200 values is 0.33999")
-            # plt.plot(range(len(loss_list_b), len(loss_list_b) + len(loss_list_a)), loss_list_a, label="Loss after LR drop")
-
-            plt.title("Coordinates Loss")
-            plt.legend()
-            plt.show()
-
-            return
 
     if "checkpoint" in args.pretrained_model:
         state_dict = torch.load(args.pretrained_model)["model"]
@@ -587,7 +588,7 @@ def evaluate_toy_setting(model, data_loader_val, criterion, device, args):
         outputs = model(samples)
         outputs = {k: v for k, v in outputs.items() if k != 'aux_outputs'}
 
-        # plot_prediction(samples, outputs, targets)
+        plot_prediction(samples, outputs, targets)
 
         indices = criterion.get_indices(outputs, targets)
 
