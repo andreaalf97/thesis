@@ -80,6 +80,7 @@ def get_args_parser():
 
     # dataset parameters
     parser.add_argument('--dataset_file', default='toy_setting')  # 'toy_setting' for generated images
+    parser.add_argument('--colored', action='store_true')  # To train or test on colored images
     parser.add_argument('--coco_path', type=str, default="")  # /home/andreaalf/Documents/detr/coco_dataset
     parser.add_argument('--coco_panoptic_path', type=str)
     parser.add_argument('--remove_difficult', action='store_true')
@@ -98,7 +99,7 @@ def get_args_parser():
     parser.add_argument('--pretrained_model', default='tmp/10slots_300epochs_24h.pth')
     parser.add_argument('--training_output_file', default='')
     parser.add_argument('--num_gates', default='-1')  # -1 for random number between 1 and 5
-    parser.add_argument('--iou_treshold', default='0.70')
+    parser.add_argument('--iou_treshold', default='0.90')
 
     parser.add_argument('--num_workers', default=2, type=int)
 

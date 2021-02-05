@@ -16,7 +16,8 @@ from datasets.panoptic_eval import PanopticEvaluator
 import matplotlib.pyplot as plt
 from scipy.signal import savgol_filter
 import numpy as np
-from shapely.geometry import box, Polygon
+from shapely.geometry import Polygon
+from shapely.errors import TopologicalError
 
 
 def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
@@ -303,7 +304,7 @@ def plot_prediction(samples: utils.NestedTensor, outputs: dict, targets: tuple):
 
 
 @torch.no_grad()
-def plot_single_sample(sample: torch.Tensor, prediction_box: torch.Tensor, gt_box: torch.Tensor, title="") -> None:
+def plot_single_sample(sample: torch.Tensor, prediction_box: torch.Tensor, gt_box: torch.Tensor, title="", s=16) -> None:
 
     plt.imshow(sample.cpu().permute(1, 2, 0))
     h = list(sample.shape)[1]
@@ -326,7 +327,7 @@ def plot_single_sample(sample: torch.Tensor, prediction_box: torch.Tensor, gt_bo
     x_s = [x.item() for x in x_s]
     y_s = [x.item() for x in y_s]
 
-    plt.scatter(x_s, y_s, c='red', label="Prediction")
+    plt.scatter(x_s, y_s, c='red', label="Prediction", s=s)
 
     x_s = [
         gt_box[0] * w,
@@ -345,7 +346,7 @@ def plot_single_sample(sample: torch.Tensor, prediction_box: torch.Tensor, gt_bo
     x_s = [x.item() for x in x_s]
     y_s = [x.item() for x in y_s]
 
-    plt.scatter(x_s, y_s, c='blue', label="Grund truth")
+    plt.scatter(x_s, y_s, c='blue', label="Grund truth", s=s)
 
     plt.title(title)
     plt.legend()
@@ -475,27 +476,19 @@ def iou(prediction: torch.Tensor, gt: torch.Tensor) -> float:
         # union = pred_poly.union(gt_poly).area
 
         return intersection/union
-    except:
-        print(f"Error with polygons\nPrediction: {prediction}\nGT: {gt}")
-        return 0.0
+    except TopologicalError:
+        return -1
 
 
 @torch.no_grad()
-def longest_edge(gt_box: torch.Tensor) -> float:
+def corner_distances(pred_box: torch.Tensor, real_box: torch.Tensor) -> tuple:
 
-    box = gt_box.tolist()
+    bl = math.sqrt((pred_box[0] - real_box[0])**2 + (pred_box[1] - real_box[1])**2)
+    tl = math.sqrt((pred_box[2] - real_box[2])**2 + (pred_box[3] - real_box[3])**2)
+    tr = math.sqrt((pred_box[4] - real_box[4])**2 + (pred_box[5] - real_box[5])**2)
+    br = math.sqrt((pred_box[6] - real_box[6])**2 + (pred_box[7] - real_box[7])**2)
 
-    bl = box[0], box[1]
-    tl = box[2], box[3]
-    tr = box[4], box[5]
-    br = box[6], box[7]
-
-    b = math.sqrt((bl[0] - br[0])**2 + (bl[1] - br[1])**2)
-    l = math.sqrt((bl[0] - tl[0])**2 + (bl[1] - tl[1])**2)
-    t = math.sqrt((tl[0] - tr[0])**2 + (tl[1] - tr[1])**2)
-    r = math.sqrt((br[0] - tr[0])**2 + (br[1] - tr[1])**2)
-
-    return max([b, l, t, r])
+    return bl, tl, tr, br
 
 
 @torch.no_grad()
@@ -582,7 +575,7 @@ def evaluate_toy_setting(model, data_loader_val, criterion, device, args):
     wrong_coord_gates = 0
     num_predictions = 0
 
-    iou_treshold = float(args.iou_treshold)
+    iou_threshold = float(args.iou_treshold)
 
     len_data = len(data_loader_val)
 
@@ -606,6 +599,7 @@ def evaluate_toy_setting(model, data_loader_val, criterion, device, args):
             for i, (pred_logit, pred_box) in enumerate(zip(pred_logits, pred_boxes)):
                 num_predictions += 1
                 _, pred_class = torch.max(pred_logit, 0)
+                # confidence, pred_class = torch.max(torch.softmax(pred_logit, dim=0), 0)
 
                 if i in idx[0]:  # Matched with a gate
                     real_box = real_boxes[idx[1][idx[0].index(i)]]
@@ -620,13 +614,14 @@ def evaluate_toy_setting(model, data_loader_val, criterion, device, args):
                         iou_score = iou(pred_box, real_box)
 
                         # If the IOU score is smaller than the threshold, it's a wrong prediction
-                        if iou_score < iou_treshold and longest_edge(real_box) > 0.04:
-                            wrong_coord_gates += 1
-                            # plot_single_sample(sample, pred_box, real_box, title=f"False positive (distance): iou {iou_score}")
-                            confusion_matrix['F']['T'] += 1
-                            continue
+                        if iou_score < iou_threshold:
+                            if iou_score == -1 or max(corner_distances(pred_box, real_box)) > 0.02:
+                                wrong_coord_gates += 1
+                                # plot_single_sample(sample, pred_box, real_box, title=f"False positive (iou %.2f and distance %.4f)" % (iou_score, max(corner_distances(pred_box, real_box))))
+                                confusion_matrix['F']['T'] += 1
+                                continue
                         iou_sum += iou_score
-                        # plot_single_sample(sample, pred_box, real_box, title="True positive")
+                        # plot_single_sample(sample, pred_box, real_box, title=("True positive (IoU %.8f)" % iou_score))
                         confusion_matrix['T']['T'] += 1
                         num_loss_checks += 1
                     else:
@@ -634,7 +629,7 @@ def evaluate_toy_setting(model, data_loader_val, criterion, device, args):
                         confusion_matrix['F']['F'] += 1
                 else:  # Not matched with a gate
                     if pred_class == 0:
-                        # plot_single_sample(sample, pred_box, real_box, title="False positive (matching)")
+                        # plot_single_sample(sample, pred_box, real_box, title=("False positive (matching) with confidence %.4f" % confidence))
                         confusion_matrix['F']['T'] += 1
                     else:
                         # plot_single_sample(sample, pred_box, real_box, title="True negative")

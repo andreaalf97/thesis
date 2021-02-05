@@ -25,7 +25,8 @@ def build_dataset(image_set, args):
         return build_coco_panoptic(image_set, args)
     if args.dataset_file == 'toy_setting':
         if int(args.num_gates) == -1:
-            return TSDataset(256, 256)
+            return TSDataset(256, 256, black_and_white=(not args.colored))
         else:
-            return TSDataset(256, 256, num_gates=int(args.num_gates), rand_gate_number=False)
+            return TSDataset(256, 256, num_gates=int(args.num_gates),
+                             rand_gate_number=True, black_and_white=(not args.colored))
     raise ValueError(f'dataset {args.dataset_file} not supported')

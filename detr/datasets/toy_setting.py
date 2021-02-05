@@ -150,7 +150,8 @@ class Gate:
             )
 
 
-def get_ts_image(height, width, num_gates=3, padding=5, rand_gate_number=False, no_gate_chance=0.10, rotate_chance=0.5, shift_chance=0.5) -> (np.ndarray, list, list):
+def get_ts_image(height, width, num_gates=3, padding=5, rand_gate_number=False, no_gate_chance=0.10,
+                 rotate_chance=0.5, shift_chance=0.5, black_and_white=True) -> (np.ndarray, list, list):
     assert padding >= 0 and isinstance(padding, int)
 
     if rand_gate_number:
@@ -159,16 +160,16 @@ def get_ts_image(height, width, num_gates=3, padding=5, rand_gate_number=False, 
         else:
             num_gates = random.randint(1, num_gates)
 
-    img = get_ts_background(height, width, bgr=True, real_background_prob=0.0, black_white=True)
+    img = get_ts_background(height, width, bgr=True, real_background_prob=0.0, black_white=black_and_white)
 
     labels = []
     areas = []
 
     for _ in range(num_gates):
-        if img[0][0][0] == 0:
+        if black_and_white:
             gate = Gate(height, width, perc_of_image_width=0.80, color='white')
         else:
-            gate = Gate(height, width, perc_of_image_width=0.80, color='black')
+            gate = Gate(height, width, perc_of_image_width=0.80, color='none')
 
         if random.random() < rotate_chance:
             gate.rand_rotate()
@@ -265,13 +266,9 @@ def get_ts_background(height, width, real_background_prob=0.0, bgr=False, black_
 
         return image
 
-    red = int(random.random() * 255)
-    green = int(random.random() * 255)
-    blue = int(random.random() * 255)
-
-    # red = 0
-    # green = 255
-    # blue = 242
+    red = random.randint(0, 255)
+    green = random.randint(0, 255)
+    blue = random.randint(0, 255)
 
     image = np.zeros(
         (height, width, 3),
@@ -295,24 +292,23 @@ def display_image(image: np.ndarray, labels):
 
 class TSDataset(torch.utils.data.Dataset):
 
-    def __init__(self, img_height, img_width, num_gates=5, padding=5, rand_gate_number=True,
+    def __init__(self, img_height, img_width, num_gates=5, padding=5, rand_gate_number=True, black_and_white=True,
                  no_gate_chance=0.0, rotate_chance=0.5, shift_chance=0.5, transform=ToTensor()):
         self.img_height = img_height
         self.img_width = img_width
         self.num_gates = num_gates
         self.padding = padding
         self.rand_gate_number = rand_gate_number
+        self.black_and_white = black_and_white
         self.no_gate_chance = no_gate_chance
         self.rotate_chance = rotate_chance
         self.shift_chance = shift_chance
-        self.generated_images = 0
         self.transform = transform
 
     def __len__(self):
         return 10000
 
     def __getitem__(self, index):
-        self.generated_images += 1
         image, labels, areas = get_ts_image(
             self.img_height,
             self.img_width,
@@ -321,7 +317,8 @@ class TSDataset(torch.utils.data.Dataset):
             rand_gate_number=self.rand_gate_number,
             no_gate_chance=self.no_gate_chance,
             rotate_chance=self.rotate_chance,
-            shift_chance=self.shift_chance
+            shift_chance=self.shift_chance,
+            black_and_white=self.black_and_white
         )
 
         # boxes, labels, image_id, area, iscrowd, orig_size, size
