@@ -588,7 +588,7 @@ def evaluate_toy_setting(model, data_loader_val, criterion, device, args):
         outputs = model(samples)
         outputs = {k: v for k, v in outputs.items() if k != 'aux_outputs'}
 
-        plot_prediction(samples, outputs, targets)
+        # plot_prediction(samples, outputs, targets)
 
         indices = criterion.get_indices(outputs, targets)
 
