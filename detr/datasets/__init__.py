@@ -4,6 +4,7 @@ import torchvision
 
 from .coco import build as build_coco
 from .toy_setting import TSDataset
+from .real_gates import RealGatesDS
 
 
 def get_coco_api_from_dataset(dataset):
@@ -29,4 +30,6 @@ def build_dataset(image_set, args):
         else:
             return TSDataset(256, 256, num_gates=int(args.num_gates),
                              rand_gate_number=True, black_and_white=(not args.colored))
+    if args.dataset_file == 'real_gates':
+        return RealGatesDS(args.real_gate_path, image_set)
     raise ValueError(f'dataset {args.dataset_file} not supported')
