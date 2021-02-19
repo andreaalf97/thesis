@@ -72,6 +72,7 @@ class BackboneBase(nn.Module):
     def forward(self, tensor_list: NestedTensor):
         xs = self.body(tensor_list.tensors)
         out: Dict[str, NestedTensor] = {}
+        # IF returning only last layer, name is '0' and x is a tensor [2, 2048, 8, 8]
         for name, x in xs.items():
             m = tensor_list.mask
             assert m is not None
@@ -82,10 +83,10 @@ class BackboneBase(nn.Module):
 
 class Backbone(BackboneBase):
     """ResNet backbone with frozen BatchNorm."""
-    def __init__(self, name: str,
-                 train_backbone: bool,
-                 return_interm_layers: bool,
-                 dilation: bool):
+    def __init__(self, name: str,  # DEFAULT: 'resnet50'
+                 train_backbone: bool,  # DEFAULT: True
+                 return_interm_layers: bool,  # DEFAULT: False
+                 dilation: bool):  # DEFAULT: False
         backbone = getattr(torchvision.models, name)(
             replace_stride_with_dilation=[False, False, dilation],
             pretrained=is_main_process(), norm_layer=FrozenBatchNorm2d)
@@ -98,6 +99,10 @@ class Joiner(nn.Sequential):
         super().__init__(backbone, position_embedding)
 
     def forward(self, tensor_list: NestedTensor):
+        # IF returning only last layer of CNN:
+        # xs is a DICT with only key '0' and as value a NestedTensor:
+        #   tensors --> [2, 2048, 8, 8]
+        #   mask --> [2, 8, 8]
         xs = self[0](tensor_list)
         out: List[NestedTensor] = []
         pos = []
@@ -112,7 +117,7 @@ class Joiner(nn.Sequential):
 def build_backbone(args):
     position_embedding = build_position_encoding(args)
     train_backbone = args.lr_backbone > 0
-    return_interm_layers = args.masks
+    return_interm_layers = args.masks  # FALSE for object detection
     backbone = Backbone(args.backbone, train_backbone, return_interm_layers, args.dilation)
     model = Joiner(backbone, position_embedding)
     model.num_channels = backbone.num_channels

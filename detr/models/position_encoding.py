@@ -26,6 +26,7 @@ class PositionEmbeddingSine(nn.Module):
         self.scale = scale
 
     def forward(self, tensor_list: NestedTensor):
+        # In our case tensor_list has .tensors of shape [2, 2048, 8, 8] and a .mask shape of [2, 8, 8]
         x = tensor_list.tensors
         mask = tensor_list.mask
         assert mask is not None
@@ -77,7 +78,7 @@ class PositionEmbeddingLearned(nn.Module):
 
 
 def build_position_encoding(args):
-    N_steps = args.hidden_dim // 2
+    N_steps = args.hidden_dim // 2  # Integer division (10 // 3 = 3)
     if args.position_embedding in ('v2', 'sine'):
         # TODO find a better way of exposing other arguments
         position_embedding = PositionEmbeddingSine(N_steps, normalize=True)

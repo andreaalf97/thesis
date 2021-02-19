@@ -45,9 +45,16 @@ class Transformer(nn.Module):
                 nn.init.xavier_uniform_(p)
 
     def forward(self, src, mask, query_embed, pos_embed):
+        """
+        src shape torch.Size([2, 256, 8, 8])
+        mask shape torch.Size([2, 8, 8])
+        query_embed shape torch.Size([10, 256])
+        pos_embed shape torch.Size([2, 256, 8, 8])
+        """
         # flatten NxCxHxW to HWxNxC
         bs, c, h, w = src.shape
         src = src.flatten(2).permute(2, 0, 1)
+        # Now src is [8x8, 2, 256]
         pos_embed = pos_embed.flatten(2).permute(2, 0, 1)
         query_embed = query_embed.unsqueeze(1).repeat(1, bs, 1)
         mask = mask.flatten(1)

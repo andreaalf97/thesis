@@ -61,7 +61,7 @@ class DETR(nn.Module):
 
         """
             Samples is a NestedTensor of dim [batch_size, 3, 256, 256]
-            Features is a list of len 1 of NestedTensors of shape [2, torch.Size([2048, 8, 8])]
+            Features is a list of len 1 of NestedTensors of shape [2, 2048, 8, 8])]
             Pos is a list of lenght 1 of a tensor of shape [2, 256, 8, 8]
         """
         features, pos = self.backbone(samples)
