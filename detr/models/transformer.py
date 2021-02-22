@@ -106,6 +106,7 @@ class TransformerDecoder(nn.Module):
                 memory_key_padding_mask: Optional[Tensor] = None,
                 pos: Optional[Tensor] = None,
                 query_pos: Optional[Tensor] = None):
+        # Initially, tgt is all zeros
         output = tgt
 
         intermediate = []
@@ -223,11 +224,26 @@ class TransformerDecoderLayer(nn.Module):
                      memory_key_padding_mask: Optional[Tensor] = None,
                      pos: Optional[Tensor] = None,
                      query_pos: Optional[Tensor] = None):
+        """
+        memory --> [64, 2, 256]
+        tgt --> [10, 2, 256]
+
+        In the self attention layer:
+            query: [10, 2, 256]
+            key: [10, 2, 256]
+            value: [10, 2, 256]
+        """
         q = k = self.with_pos_embed(tgt, query_pos)
         tgt2 = self.self_attn(q, k, value=tgt, attn_mask=tgt_mask,
                               key_padding_mask=tgt_key_padding_mask)[0]
         tgt = tgt + self.dropout1(tgt2)
         tgt = self.norm1(tgt)
+        """
+        In the multihead_attn we pass:
+            query: [10, 2, 256]
+            key: [64, 2, 256]
+            value: [64, 2, 256]
+        """
         tgt2 = self.multihead_attn(query=self.with_pos_embed(tgt, query_pos),
                                    key=self.with_pos_embed(memory, pos),
                                    value=memory, attn_mask=memory_mask,

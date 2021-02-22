@@ -79,8 +79,8 @@ def get_args_parser():
                         help="Relative classification weight of the no-object class")
 
     # dataset parameters
-    parser.add_argument('--dataset_file', default='toy_setting')  # 'toy_setting' for generated images
-    parser.add_argument('--real_gate_path', type=str, default="/home/andreaalf/Documents/thesis/datasets/kanglang")  # /home/andreaalf/Documents/detr/coco_dataset
+    parser.add_argument('--dataset_file', default='toy_setting')  # 'toy_setting' for generated images, 'real_gates' otherwise
+    parser.add_argument('--real_gate_path', type=str, default="/home/andreaalf/Documents/thesis/datasets/gate_full")  # /home/andreaalf/Documents/detr/coco_dataset
     parser.add_argument('--colored', action='store_true')  # To train or test on colored images
     parser.add_argument('--coco_path', type=str, default="")  # /home/andreaalf/Documents/detr/coco_dataset
     parser.add_argument('--coco_panoptic_path', type=str)

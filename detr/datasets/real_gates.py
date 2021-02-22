@@ -40,29 +40,33 @@ class Resize(object):
 
 
 class RealGatesDS(torch.utils.data.Dataset):
-
     img_extension = '.jpg'
 
     folders = {
         "basement_course1": ".xml",
         "basement_course3": ".xml",
-        "bebop_merge": ".xml",
-        "bebop_merge_distort": ".xml",
-        "cyberzoo": ".xml",
-        "daylight15k": ".xml",
-        "daylight_course1": ".xml",
-        "daylight_course3": ".xml",
-        "daylight_course5": ".xml",
+        # "bebop_merge": ".xml",
+        # "bebop_merge_distort": ".xml",
+        # "cyberzoo": ".xml",
+        # "daylight15k": ".xml",
+        # "daylight_course1": ".xml",
+        # "daylight_course3": ".xml",
+        # "daylight_course5": ".xml",
         "daylight_flight": ".xml",
-        "eth": ".pkl",
-        "google_merge_distort": ".xml",
-        "iros2018_course1": ".xml",
-        "iros2018_course3_test": ".xml",
-        "iros2018_course5": ".xml",
-        "iros2018_flights": ".xml",
-        "iros2018_frontal": ".xml",
-        "random_flight": ".xml"
+        # "eth": ".pkl",
+        # "google_merge_distort": ".xml",
+        # "iros2018_course1": ".xml",
+        # "iros2018_course3_test": ".xml",
+        # "iros2018_course5": ".xml",
+        # "iros2018_flights": ".xml",
+        # "iros2018_frontal": ".xml",
+        # "random_flight": ".xml"
     }
+
+    std_transform = T.Compose([
+        ToTensor(),
+        Resize([256, 256])
+    ])
 
     def __init__(self, path, image_set, transform=None):
 
@@ -72,7 +76,10 @@ class RealGatesDS(torch.utils.data.Dataset):
         for folder in self.folders:
             assert folder in path_dirs, f"'{folder}' directory is missing from path"
 
-        self.transform = transform
+        if transform is None:
+            self.transform = self.std_transform
+        else:
+            self.transform = transform
         self.files = []
 
         for folder in self.folders:
@@ -80,43 +87,50 @@ class RealGatesDS(torch.utils.data.Dataset):
             all_files = listdir(folder_path)
             for file in all_files:
                 if isfile(join(folder_path, file)) and 'jpg' in file:
-                    self.files.append(join(folder_path, file).replace('.jpg', self.folders[folder]))
+                    xml_path = join(folder_path, file).replace('.jpg', self.folders[folder])
+                    if len(ET.parse(xml_path).getroot().findall('object')) > 0:
+                        self.files.append(xml_path)
 
     def __len__(self):
         return len(self.files)
 
     def __getitem__(self, item):
+        """XML CONVENTION
+        annotation
+		filename
+		object
+		    name
+		    bndbox --> xmin, ymin, xmax, ymax
+		    pose --> north, east, down, yaw, pitch, roll
+		    gate_corners --> top_left, top_right, bottom_right, bottom_left, center
+		object..
+        """
 
-        print(self.files[item])
+        item_path = self.files[item]
 
-        img = Image.open(self.files[item].split('.')[0] + '.jpg')
+        img = Image.open(item_path.split('.')[0] + '.jpg')
 
         tens = T.ToTensor()
         orig_shape = [tens(img).shape[1], tens(img).shape[2]]
         height, width = orig_shape[0], orig_shape[1]
 
-        xml = ET.parse(self.files[item]).getroot()
+        xml = ET.parse(item_path).getroot()
 
         gates = []
-        for obj in xml.findall('object'):
+        xml_objects = xml.findall('object')
+        assert xml_objects is not None, "No gates found in XML file"
 
-            # First we check if the object is a GATE object
-            not_gate = False
-            for name in obj.find('name'):
-                if name.text != 'gate':
-                    not_gate = True
-            if not_gate:
-                print("NOT A GATE @", self.files[item])
-                continue
+        for obj in xml_objects:
+            assert obj.find('name').text == 'gate', "XML gate object not named 'gate"
+            assert obj.find('gate_corners') is not None
 
             gate_corners = []
 
             for corner in obj.find('gate_corners'):
                 gate_corners.append([
                     float(corner.text.split(',')[0]) / width,
-                    float(corner.text.split(',')[1]) / height
+                    (height-float(corner.text.split(',')[1])) / height
                 ])
-
             # This is done to follow the usual convention of starting with the BL corner and go clockwise
             gate_corners = [
                 gate_corners[3],
@@ -156,12 +170,12 @@ class RealGatesDS(torch.utils.data.Dataset):
 if __name__ == '__main__':
 
     transform = T.Compose([
-        ToTensor()
-        # Resize([256, 256])
+        ToTensor(),
+        Resize([256, 256])
     ])
 
     ds = RealGatesDS(
-        "/home/andreaalf/Documents/thesis/datasets/gate_full",
+        "/home/andreaalf/Documents/thesis/datasets/gate_full_sample",
         image_set='train',
         transform=transform
     )
@@ -171,20 +185,8 @@ if __name__ == '__main__':
 
         h, w = img.shape[-2:]
 
-        gates = target["boxes"]
-        for gate in gates:
-            plt.scatter(gate[:, 0] * w, gate[:, 1] * h)
+        boxes = target['boxes']
+        for gate in boxes:
+            plt.scatter(gate[:, 0]*w, gate[:, 1]*h)
 
-        # plt.show()
-        # break
-        # shape = str(list(img.shape))
-        #
-        # if shape not in shapes:
-        #     shapes[shape] = 1
-        # else:
-        #     shapes[shape] += 1
-
-
-
-
-    exit(0)
+        plt.show()
