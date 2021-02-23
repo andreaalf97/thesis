@@ -121,10 +121,10 @@ class RealGatesDS(torch.utils.data.Dataset):
         # "bebop_merge_distort": ".xml",
         # "cyberzoo": ".xml",
         "daylight15k": ".xml",
-        "daylight_course1": ".xml",
-        "daylight_course3": ".xml",
-        "daylight_course5": ".xml",
-        "daylight_flight": ".xml",
+        # "daylight_course1": ".xml",
+        # "daylight_course3": ".xml",
+        # "daylight_course5": ".xml",
+        # "daylight_flight": ".xml",
         # "eth": ".pkl",
         # "google_merge_distort": ".xml",
         # "iros2018_course1": ".xml",
@@ -148,6 +148,9 @@ class RealGatesDS(torch.utils.data.Dataset):
     def __init__(self, path, image_set, transform=None):
 
         assert 'train' in image_set or 'val' in image_set
+
+        print("[RG DATASET] INITIALIZING Real Gates dataset..")
+
         path_dirs = listdir(path)
 
         for folder in self.folders:
@@ -159,14 +162,22 @@ class RealGatesDS(torch.utils.data.Dataset):
             self.transform = transform
         self.files = []
 
+        if 'val' in image_set:
+            print("[RG DATASET] Returning empty dataloader for 'val' set")
+            return
+
         for folder in self.folders:
+            print("[RG DATASET] Creating index for folder:", folder)
             folder_path = join(path, folder)
             all_files = listdir(folder_path)
+            print(f"[RG DATASET] containing {len(all_files)} files")
             for file in all_files:
                 if isfile(join(folder_path, file)) and 'jpg' in file:
                     xml_path = join(folder_path, file).replace('.jpg', self.folders[folder])
                     if len(ET.parse(xml_path).getroot().findall('object')) > 0:
                         self.files.append(xml_path)
+
+        print(f"[RG DATASET] Created dataset containing {len(self.files)} images.")
 
     def __len__(self):
         return len(self.files)
@@ -185,7 +196,7 @@ class RealGatesDS(torch.utils.data.Dataset):
 
         item_path = self.files[item]
 
-        img = Image.open(item_path.split('.')[0] + '.jpg')
+        img = Image.open(item_path.replace('.xml', '.jpg'))
 
         tens = T.ToTensor()
         orig_shape = [tens(img).shape[1], tens(img).shape[2]]
