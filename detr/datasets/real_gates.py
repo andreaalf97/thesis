@@ -6,6 +6,7 @@ import xml.etree.ElementTree as ET
 from PIL import Image
 from shapely.geometry import Polygon
 import matplotlib.pyplot as plt
+import random
 
 
 class ToTensor(object):
@@ -15,6 +16,77 @@ class ToTensor(object):
     def __call__(self, item: tuple) -> tuple:
         img, target = item
         img = self.t(img)
+        return img, target
+
+
+class Brightness(object):
+    def __init__(self, p=0.5, brightness=2):
+        self.p = p
+        self.b = T.ColorJitter(brightness=brightness)
+
+    def __call__(self, item: tuple) -> tuple:
+        img, target = item
+        if random.random() <= self.p:
+            img = self.b(img)
+        return img, target
+
+
+class Contrast(object):
+    def __init__(self, p=0.5, contrast=2):
+        self.p = p
+        self.b = T.ColorJitter(contrast=contrast)
+
+    def __call__(self, item: tuple) -> tuple:
+        img, target = item
+        if random.random() <= self.p:
+            img = self.b(img)
+        return img, target
+
+
+class Hue(object):
+    def __init__(self, p=0.5, hue=0.25):
+        self.p = p
+        self.b = T.ColorJitter(hue=hue)
+
+    def __call__(self, item: tuple) -> tuple:
+        img, target = item
+        if random.random() <= self.p:
+            img = self.b(img)
+        return img, target
+
+
+class Saturation(object):
+    def __init__(self, p=0.5, saturation=2):
+        self.p = p
+        self.b = T.ColorJitter(saturation=saturation)
+
+    def __call__(self, item: tuple) -> tuple:
+        img, target = item
+        if random.random() <= self.p:
+            img = self.b(img)
+        return img, target
+
+
+class RandomFlip(object):
+    def __init__(self, p=0.5):
+        self.p = p
+        self.f = T.RandomHorizontalFlip(p=1.0)
+
+    def __call__(self, item: tuple) -> tuple:
+        img, target = item
+        if random.random() <= self.p:
+            img = self.f(img)
+            boxes = torch.clone(target['boxes'])
+            for gate in boxes:
+                gate[0] = 1.0 - gate[0]
+                gate[2] = 1.0 - gate[2]
+                gate[4] = 1.0 - gate[4]
+                gate[6] = 1.0 - gate[6]
+            upd_dict = {
+                'boxes': boxes
+            }
+            target.update(upd_dict)
+
         return img, target
 
 
@@ -43,15 +115,15 @@ class RealGatesDS(torch.utils.data.Dataset):
     img_extension = '.jpg'
 
     folders = {
-        "basement_course1": ".xml",
-        "basement_course3": ".xml",
+        # "basement_course1": ".xml",
+        # "basement_course3": ".xml",
         # "bebop_merge": ".xml",
         # "bebop_merge_distort": ".xml",
         # "cyberzoo": ".xml",
-        # "daylight15k": ".xml",
-        # "daylight_course1": ".xml",
-        # "daylight_course3": ".xml",
-        # "daylight_course5": ".xml",
+        "daylight15k": ".xml",
+        "daylight_course1": ".xml",
+        "daylight_course3": ".xml",
+        "daylight_course5": ".xml",
         "daylight_flight": ".xml",
         # "eth": ".pkl",
         # "google_merge_distort": ".xml",
@@ -65,7 +137,12 @@ class RealGatesDS(torch.utils.data.Dataset):
 
     std_transform = T.Compose([
         ToTensor(),
-        Resize([256, 256])
+        Resize([256, 256]),
+        RandomFlip(p=0.5),
+        Brightness(p=0.1, brightness=2),
+        Contrast(p=0.1, contrast=2),
+        Saturation(p=0.1, saturation=2),
+        Hue(p=0.1, hue=0.25)
     ])
 
     def __init__(self, path, image_set, transform=None):
@@ -96,14 +173,14 @@ class RealGatesDS(torch.utils.data.Dataset):
 
     def __getitem__(self, item):
         """XML CONVENTION
-        annotation
-		filename
-		object
-		    name
-		    bndbox --> xmin, ymin, xmax, ymax
-		    pose --> north, east, down, yaw, pitch, roll
-		    gate_corners --> top_left, top_right, bottom_right, bottom_left, center
-		object..
+            annotation
+            filename
+            object
+                name
+                bndbox --> xmin, ymin, xmax, ymax
+                pose --> north, east, down, yaw, pitch, roll
+                gate_corners --> top_left, top_right, bottom_right, bottom_left, center
+            object..
         """
 
         item_path = self.files[item]
@@ -127,22 +204,35 @@ class RealGatesDS(torch.utils.data.Dataset):
             gate_corners = []
 
             for corner in obj.find('gate_corners'):
-                gate_corners.append([
-                    float(corner.text.split(',')[0]) / width,
+                gate_corners.append(
+                    float(corner.text.split(',')[0]) / width
+                )
+                gate_corners.append(
                     (height-float(corner.text.split(',')[1])) / height
-                ])
+                )
             # This is done to follow the usual convention of starting with the BL corner and go clockwise
             gate_corners = [
-                gate_corners[3],
+                gate_corners[6],
+                gate_corners[7],
                 gate_corners[0],
                 gate_corners[1],
-                gate_corners[2]
+                gate_corners[2],
+                gate_corners[3],
+                gate_corners[4],
+                gate_corners[5],
+
             ]
             gates.append(gate_corners)
 
         areas = []
         for gate in gates:
-            poly = Polygon(gate)
+            poly_gate = [
+                [gate[0], gate[1]],
+                [gate[2], gate[3]],
+                [gate[4], gate[5]],
+                [gate[6], gate[7]]
+            ]
+            poly = Polygon(poly_gate)
             areas.append(poly.area)
 
         target = {
@@ -169,15 +259,9 @@ class RealGatesDS(torch.utils.data.Dataset):
 
 if __name__ == '__main__':
 
-    transform = T.Compose([
-        ToTensor(),
-        Resize([256, 256])
-    ])
-
     ds = RealGatesDS(
         "/home/andreaalf/Documents/thesis/datasets/gate_full_sample",
-        image_set='train',
-        transform=transform
+        image_set='train'
     )
 
     for img, target in ds:
@@ -187,6 +271,18 @@ if __name__ == '__main__':
 
         boxes = target['boxes']
         for gate in boxes:
-            plt.scatter(gate[:, 0]*w, gate[:, 1]*h)
+            x = torch.tensor([
+                gate[0],
+                gate[2],
+                gate[4],
+                gate[6]
+            ])
+            y = torch.tensor([
+                gate[1],
+                gate[3],
+                gate[5],
+                gate[7]
+            ])
+            plt.scatter(x*w, y*h)
 
         plt.show()
