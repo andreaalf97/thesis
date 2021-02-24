@@ -124,7 +124,7 @@ class RealGatesDS(torch.utils.data.Dataset):
         "daylight_course1": ".xml",
         "daylight_course3": ".xml",
         "daylight_course5": ".xml",
-        "daylight_flight": ".xml",
+        "daylight_flight": ".xml"
         # "eth": ".pkl",
         # "google_merge_distort": ".xml",
         # "iros2018_course1": ".xml",
