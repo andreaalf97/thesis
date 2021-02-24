@@ -280,7 +280,7 @@ def plot_prediction(samples: utils.NestedTensor, outputs: dict, targets: tuple):
             logit = torch.softmax(logit, 0)
             confidence, index = torch.max(logit, 0)
 
-            if index.item() != 1:
+            if index.item() == 0:
                 num_predictions += 1
                 for i in range(len(coord)):
                     if coord[i] >= 1.0:
