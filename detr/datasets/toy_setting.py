@@ -4,6 +4,8 @@ import random
 import os
 import torch
 from torchvision.transforms import ToTensor
+import matplotlib.pyplot as plt
+from matplotlib.patches import Rectangle
 
 
 class Gate:
@@ -293,7 +295,7 @@ def display_image(image: np.ndarray, labels):
 class TSDataset(torch.utils.data.Dataset):
 
     def __init__(self, img_height, img_width, num_gates=5, padding=5, rand_gate_number=True, black_and_white=True,
-                 no_gate_chance=0.0, rotate_chance=0.5, shift_chance=0.5, transform=ToTensor()):
+                 no_gate_chance=0.0, rotate_chance=0.5, shift_chance=0.5, bbox=False, transform=ToTensor()):
         self.img_height = img_height
         self.img_width = img_width
         self.num_gates = num_gates
@@ -303,6 +305,7 @@ class TSDataset(torch.utils.data.Dataset):
         self.no_gate_chance = no_gate_chance
         self.rotate_chance = rotate_chance
         self.shift_chance = shift_chance
+        self.bbox = bbox
         self.transform = transform
 
     def __len__(self):
@@ -321,6 +324,23 @@ class TSDataset(torch.utils.data.Dataset):
             black_and_white=self.black_and_white
         )
 
+        if self.bbox:
+            new_labels = []
+            for gate in labels:
+                min_x = min(gate[0], gate[2], gate[4], gate[6])
+                min_y = min(gate[1], gate[3], gate[5], gate[7])
+                max_x = max(gate[0], gate[2], gate[4], gate[6])
+                max_y = max(gate[1], gate[3], gate[5], gate[7])
+
+                x_c = (max_x + min_x) / 2
+                y_c = (max_y + min_y) / 2
+                h = (max_y - min_y) + (5/self.img_height)
+                w = (max_x - min_x) + (5/self.img_width)
+
+                new_labels.append([x_c, y_c, h, w])
+
+            labels = new_labels
+
         # boxes, labels, image_id, area, iscrowd, orig_size, size
         target = {
             'boxes': torch.tensor(labels, dtype=torch.float32),
@@ -336,3 +356,44 @@ class TSDataset(torch.utils.data.Dataset):
             image = self.transform(image)
 
         return image, target
+
+
+if __name__ == '__main__':
+    ds = TSDataset(256, 256, num_gates=5, bbox=True)
+
+    for image, label in ds:
+
+        plt.imshow(image.cpu().permute(1, 2, 0))
+        ax = plt.gca()
+        img_h, img_w = 256, 256
+
+        for gate in label['boxes']:
+            x_c, y_c, h, w = gate[0].item()*img_w, gate[1].item()*img_h, gate[2].item()*img_h, gate[3].item()*img_w
+
+            # x = [
+            #     x_c - (w / 2),
+            #     x_c - (w / 2),
+            #     x_c + (w / 2),
+            #     x_c + (w / 2),
+            # ]
+            #
+            # y = [
+            #     y_c + (h / 2),
+            #     y_c - (h / 2),
+            #     y_c - (h / 2),
+            #     y_c + (h / 2)
+            # ]
+            #
+            # plt.plot(x, y)
+            rect = Rectangle(
+                (x_c - (w/2), y_c - (h/2)), w, h,
+                edgecolor='red',
+                facecolor='none',
+                linewidth=1
+            )
+            ax.add_patch(rect)
+
+        plt.show()
+
+
+        break
