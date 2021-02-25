@@ -7,6 +7,7 @@ from PIL import Image
 from shapely.geometry import Polygon
 import matplotlib.pyplot as plt
 import random
+import pickle
 
 
 class ToTensor(object):
@@ -112,6 +113,7 @@ class Resize(object):
 
 
 class RealGatesDS(torch.utils.data.Dataset):
+
     img_extension = '.jpg'
 
     folders = {
@@ -124,28 +126,28 @@ class RealGatesDS(torch.utils.data.Dataset):
         "daylight_course1": ".xml",
         "daylight_course3": ".xml",
         "daylight_course5": ".xml",
-        "daylight_flight": ".xml"
+        "daylight_flight": ".xml",
         # "eth": ".pkl",
         # "google_merge_distort": ".xml",
-        # "iros2018_course1": ".xml",
-        # "iros2018_course3_test": ".xml",
-        # "iros2018_course5": ".xml",
-        # "iros2018_flights": ".xml",
-        # "iros2018_frontal": ".xml",
+        "iros2018_course1": ".xml",
+        "iros2018_course3_test": ".xml",
+        "iros2018_course5": ".xml",
+        "iros2018_flights": ".xml",
+        "iros2018_frontal": ".xml"
         # "random_flight": ".xml"
     }
 
     std_transform = T.Compose([
         ToTensor(),
         Resize([256, 256]),
-        RandomFlip(p=0.5),
-        Brightness(p=0.1, brightness=2),
-        Contrast(p=0.1, contrast=2),
-        Saturation(p=0.1, saturation=2),
-        Hue(p=0.1, hue=0.25)
+        RandomFlip(p=0.5)
+        # Brightness(p=0.1, brightness=2),
+        # Contrast(p=0.1, contrast=2),
+        # Saturation(p=0.1, saturation=2),
+        # Hue(p=0.1, hue=0.25)
     ])
 
-    def __init__(self, path, image_set, transform=None):
+    def __init__(self, path, image_set, transform=None, backup_list_path=''):
 
         assert 'train' in image_set or 'val' in image_set
 
@@ -166,6 +168,16 @@ class RealGatesDS(torch.utils.data.Dataset):
             print("[RG DATASET] Returning empty dataloader for 'val' set")
             return
 
+        if backup_list_path != '' and isfile(backup_list_path):
+            print("[RG DATASET] Loading list from backup at", backup_list_path)
+            with open(backup_list_path, 'rb') as file:
+                self.files = pickle.load(file)
+                print(f"[RG DATASET] Reloaded dataset containing {len(self.files)} images from backup.")
+                return
+
+        min_gates = 999
+        max_gates = -1
+
         for folder in self.folders:
             print("[RG DATASET] Creating index for folder:", folder)
             folder_path = join(path, folder)
@@ -174,10 +186,19 @@ class RealGatesDS(torch.utils.data.Dataset):
             for file in all_files:
                 if isfile(join(folder_path, file)) and 'jpg' in file:
                     xml_path = join(folder_path, file).replace('.jpg', self.folders[folder])
-                    if len(ET.parse(xml_path).getroot().findall('object')) > 0:
+                    num_gates = len(ET.parse(xml_path).getroot().findall('object'))
+                    if num_gates > 0:
+                        min_gates = num_gates if num_gates < min_gates else min_gates
+                        max_gates = num_gates if num_gates > max_gates else max_gates
                         self.files.append(xml_path)
 
-        print(f"[RG DATASET] Created dataset containing {len(self.files)} images.")
+        if backup_list_path != '':
+            print(f"[RG DATASET] Saving a copy of the list at {backup_list_path}")
+            with open(backup_list_path, 'wb') as file:
+                pickle.dump(self.files, file)
+            print("[RG DATASET] Saved list as backup")
+
+        print(f"[RG DATASET] Created dataset containing {len(self.files)} images. Images contain {min_gates} to {max_gates} gates")
 
     def __len__(self):
         return len(self.files)

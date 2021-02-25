@@ -31,5 +31,5 @@ def build_dataset(image_set, args):
             return TSDataset(256, 256, num_gates=int(args.num_gates),
                              rand_gate_number=True, black_and_white=(not args.colored))
     if args.dataset_file == 'real_gates':
-        return RealGatesDS(args.real_gate_path, image_set)
+        return RealGatesDS(args.real_gate_path, image_set, backup_list_path=args.backup_rg_list)
     raise ValueError(f'dataset {args.dataset_file} not supported')

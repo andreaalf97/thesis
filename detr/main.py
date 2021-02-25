@@ -80,11 +80,17 @@ def get_args_parser():
 
     # dataset parameters
     parser.add_argument('--dataset_file', default='toy_setting')  # 'toy_setting' for generated images, 'real_gates' otherwise
-    parser.add_argument('--real_gate_path', type=str, default="/home/andreaalf/Documents/thesis/datasets/gate_full_sample")  # /home/andreaalf/Documents/detr/coco_dataset
     parser.add_argument('--colored', action='store_true')  # To train or test on colored images
     parser.add_argument('--coco_path', type=str, default="")  # /home/andreaalf/Documents/detr/coco_dataset
     parser.add_argument('--coco_panoptic_path', type=str)
     parser.add_argument('--remove_difficult', action='store_true')
+
+    # Args for REAL GATE Dataset
+    parser.add_argument('--real_gate_path', type=str,
+                        default="/home/andreaalf/Documents/thesis/datasets/gate_full_sample"
+                        )
+    parser.add_argument('--backup_rg_list', type=str, default="")
+
 
     parser.add_argument('--output_dir', default='',
                         help='path where to save, empty for no saving')  # default 'checkpoints'
