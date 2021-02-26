@@ -3,9 +3,73 @@ import cv2
 import random
 import os
 import torch
+import math
 from torchvision.transforms import ToTensor
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
+
+
+class PolyGate:
+    def __init__(self, image_height, image_width, color='none', max_num_corners=8):
+        self.image_height, self.image_width = image_height, image_width
+
+        self.max_num_corners = max_num_corners
+
+        self.c_x = random.randint(int(0.20*image_width), int(image_width - (0.20*image_width)))
+        self.c_y = random.randint(int(0.20*image_height), int(image_height - (0.20*image_height)))
+
+        a = [0, 0, image_width, image_width]
+        b = [0, image_height, 0, image_height]
+
+        radius_perc = random.random() * 0.25 + 0.05
+        self.radius = image_height * radius_perc
+
+        num_corners = random.randint(3, self.max_num_corners)
+
+        self.corners = []
+
+        alpha_zero = (2*math.pi / num_corners)
+        alpha = alpha_zero + (random.random() * math.pi)
+        for _ in range(num_corners):
+            x = self.c_x + self.radius * math.cos(alpha)
+            y = self.c_y + self.radius * math.sin(alpha)
+            slope = math.tan(alpha) if alpha != math.pi/2 else math.tan(alpha + 0.001)
+            delta_x = random.random() * 0.10 * self.radius - 0.05
+            delta_y = slope * delta_x
+            self.corners.append((int(x+delta_x), int(y+delta_y)))
+            alpha += alpha_zero
+
+        self.stroke = random.randint(1, 3)
+
+        if 'white' in color.lower():
+            self.color = (255, 255, 255)
+        elif 'black' in color.lower():
+            self.color = (0, 0, 0)
+        else:
+            self.color = (
+                int(random.random() * 255),
+                int(random.random() * 255),
+                int(random.random() * 255)
+            )
+
+    def get_labels(self) -> list:
+        labels = []
+
+        for corner in self.corners:
+            labels.append(corner[0]/self.image_width)
+            labels.append(corner[1]/self.image_height)
+
+        for _ in range(len(self.corners), self.max_num_corners):
+            labels.append(-1)
+            labels.append(-1)
+
+        return labels
+
+    def get_area(self) -> float:
+        return math.pi * (self.radius**2)
+
+    def get_class(self) -> int:
+        return len(self.corners)
 
 
 class Gate:
@@ -73,7 +137,10 @@ class Gate:
         h = max(right_height, left_height)
         w = max(bottom_width, top_width)
 
-        return h*w
+        return h*w/(self.image_height*self.image_width)
+
+    def get_class(self) -> int:
+        return 0
 
     def rand_shift(self, image_size_perc=0.40):
 
@@ -153,7 +220,7 @@ class Gate:
 
 
 def get_ts_image(height, width, num_gates=3, padding=5, rand_gate_number=False, no_gate_chance=0.10,
-                 rotate_chance=0.5, shift_chance=0.5, black_and_white=True) -> (np.ndarray, list, list):
+                 rotate_chance=0.5, shift_chance=0.5, black_and_white=True, polygate=False) -> (np.ndarray, list, list):
     assert padding >= 0 and isinstance(padding, int)
 
     if rand_gate_number:
@@ -166,23 +233,54 @@ def get_ts_image(height, width, num_gates=3, padding=5, rand_gate_number=False, 
 
     labels = []
     areas = []
+    classes = []
 
     for _ in range(num_gates):
         if black_and_white:
-            gate = Gate(height, width, perc_of_image_width=0.80, color='white')
+            gate = Gate(height, width, perc_of_image_width=0.80, color='white') if not polygate else\
+                PolyGate(height, width, color='white')
         else:
-            gate = Gate(height, width, perc_of_image_width=0.80, color='none')
+            gate = Gate(height, width, perc_of_image_width=0.80, color='none') if not polygate else\
+                PolyGate(height, width, color='none')
 
-        if random.random() < rotate_chance:
+        if not polygate and random.random() < rotate_chance:
             gate.rand_rotate()
-        if random.random() < shift_chance:
+        if not polygate and random.random() < shift_chance:
             gate.rand_shift(image_size_perc=0.20)
 
         labels.append(gate.get_labels())
         areas.append(gate.get_area())
-        img = print_gate(img, gate, mark_top_corners=False)
+        classes.append(gate.get_class())
+        if not polygate:
+            img = print_gate(img, gate, mark_top_corners=False)
+        else:
+            img = print_polygate(img, gate)
 
-    return img, labels, areas
+    return img, labels, areas, classes
+
+
+def print_polygate(img: np.ndarray, gate: PolyGate) -> np.ndarray:
+
+    for i in range(1, len(gate.corners)):
+        img = cv2.line(
+            img,
+            gate.corners[i-1],
+            gate.corners[i],
+            gate.color,
+            gate.stroke,
+            lineType=cv2.LINE_AA
+        )
+
+    img = cv2.line(
+        img,
+        gate.corners[-1],
+        gate.corners[0],
+        gate.color,
+        gate.stroke,
+        lineType=cv2.LINE_AA
+    )
+
+    return img
 
 
 def print_gate(img: np.ndarray, gate: Gate, mark_top_corners=False) -> np.ndarray:
@@ -295,7 +393,7 @@ def display_image(image: np.ndarray, labels):
 class TSDataset(torch.utils.data.Dataset):
 
     def __init__(self, img_height, img_width, num_gates=5, padding=5, rand_gate_number=True, black_and_white=True,
-                 no_gate_chance=0.0, rotate_chance=0.5, shift_chance=0.5, bbox=False, transform=ToTensor()):
+                 no_gate_chance=0.0, rotate_chance=0.5, shift_chance=0.5, bbox=False, transform=ToTensor(), polygate=False):
         self.img_height = img_height
         self.img_width = img_width
         self.num_gates = num_gates
@@ -307,12 +405,16 @@ class TSDataset(torch.utils.data.Dataset):
         self.shift_chance = shift_chance
         self.bbox = bbox
         self.transform = transform
+        self.polygate = polygate
+
+        if polygate:
+            assert not bbox, "bbox and polygate not compatible"
 
     def __len__(self):
         return 10000
 
     def __getitem__(self, index):
-        image, labels, areas = get_ts_image(
+        image, labels, areas, classes = get_ts_image(
             self.img_height,
             self.img_width,
             num_gates=self.num_gates,
@@ -321,7 +423,8 @@ class TSDataset(torch.utils.data.Dataset):
             no_gate_chance=self.no_gate_chance,
             rotate_chance=self.rotate_chance,
             shift_chance=self.shift_chance,
-            black_and_white=self.black_and_white
+            black_and_white=self.black_and_white,
+            polygate=self.polygate
         )
 
         if self.bbox:
@@ -344,7 +447,7 @@ class TSDataset(torch.utils.data.Dataset):
         # boxes, labels, image_id, area, iscrowd, orig_size, size
         target = {
             'boxes': torch.tensor(labels, dtype=torch.float32),
-            'labels': torch.tensor([0 for _ in range(len(labels))], dtype=torch.int64),
+            'labels': torch.tensor(classes, dtype=torch.int64),
             'image_id': torch.tensor([len(labels)], dtype=torch.int64),
             'area': torch.tensor(areas, dtype=torch.float32),
             'iscrowd': torch.tensor([0 for _ in range(len(labels))], dtype=torch.int64),
@@ -362,29 +465,13 @@ if __name__ == '__main__':
     ds = TSDataset(256, 256, num_gates=5, bbox=True)
 
     for image, label in ds:
-
         plt.imshow(image.cpu().permute(1, 2, 0))
+
         ax = plt.gca()
         img_h, img_w = 256, 256
 
         for gate in label['boxes']:
             x_c, y_c, h, w = gate[0].item()*img_w, gate[1].item()*img_h, gate[2].item()*img_h, gate[3].item()*img_w
-
-            # x = [
-            #     x_c - (w / 2),
-            #     x_c - (w / 2),
-            #     x_c + (w / 2),
-            #     x_c + (w / 2),
-            # ]
-            #
-            # y = [
-            #     y_c + (h / 2),
-            #     y_c - (h / 2),
-            #     y_c - (h / 2),
-            #     y_c + (h / 2)
-            # ]
-            #
-            # plt.plot(x, y)
             rect = Rectangle(
                 (x_c - (w/2), y_c - (h/2)), w, h,
                 edgecolor='red',
@@ -394,6 +481,4 @@ if __name__ == '__main__':
             ax.add_patch(rect)
 
         plt.show()
-
-
         break
