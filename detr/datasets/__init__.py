@@ -33,3 +33,7 @@ def build_dataset(image_set, args):
     if args.dataset_file == 'real_gates':
         return RealGatesDS(args.real_gate_path, image_set, backup_list_path=args.backup_rg_list)
     raise ValueError(f'dataset {args.dataset_file} not supported')
+
+
+def get_mask_rcnn_dataset(path: str, backup_list_path=''):
+    return RealGatesDS(path, 'train', backup_list_path=backup_list_path, mask_rcnn=True)
