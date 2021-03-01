@@ -12,6 +12,31 @@ import sys
 import matplotlib.pyplot as plt
 
 
+def show_batch(images: list, targets: list, show_mask=False) -> None:
+    for img, target in zip(images, targets):
+        plt.imshow(img.cpu().permute(1, 2, 0))
+
+        for bnd_box in target['boxes']:
+            print(bnd_box)
+            x_min = bnd_box[0].cpu()
+            y_min = bnd_box[1].cpu()
+            x_max = bnd_box[2].cpu()
+            y_max = bnd_box[3].cpu()
+            plt.scatter(
+                [x_min, x_min, x_max, x_max],
+                [y_min, y_max, y_min, y_max],
+                s=20
+            )
+
+        plt.show()
+
+        if show_mask:
+            for mask in target['masks']:
+                plt.imshow(mask.cpu())
+                plt.title(mask.shape)
+                plt.show()
+
+
 def get_instance_segmentation_model(num_classes):
     # load an instance segmentation model pre-trained on COCO
     model = torchvision.models.detection.maskrcnn_resnet50_fpn(pretrained=True)
@@ -48,20 +73,19 @@ if __name__ == '__main__':
     random.seed(seed)
 
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-    device = torch.device('cpu')
 
     num_classes = 2
 
     path = "/home/andreaalf/Documents/thesis/datasets/gate_full_sample"
     save_model_to = ""
     num_epochs = 10
-    batch_size = 2
+    batch_size = 8
 
     #############################################
     ds = get_mask_rcnn_dataset(path)
 
     data_loader = torch.utils.data.DataLoader(
-        ds, batch_size=batch_size, shuffle=True, num_workers=0,
+        ds, batch_size=batch_size, shuffle=True, num_workers=4,
         collate_fn=collate)
 
     dataset_size = len(ds)
@@ -92,26 +116,11 @@ if __name__ == '__main__':
             images = [i.to(device) for i in images]
             targets = [{k: v.to(device) for k, v in dictionary.items()} for dictionary in targets]
 
-            for img, target in zip(images, targets):
-                plt.imshow(img.cpu().permute(1, 2, 0))
-
-                for bnd_box in target['boxes']:
-                    x_min = bnd_box[0].cpu()
-                    y_min = bnd_box[1].cpu()
-                    x_max = bnd_box[2].cpu()
-                    y_max = bnd_box[3].cpu()
-                    plt.scatter(
-                        [x_min, x_min, x_max, x_max],
-                        [y_min, y_max, y_min, y_max],
-                        s=20
-                    )
-
-                plt.show()
+            show_batch(images, targets, show_mask=True)
+            exit(0)
 
             loss_dict = model(images, targets)
-            print(loss_dict)
-
-            exit(0)
+            # print('\n'.join([str(k) + ' --> ' + str(v) for k, v in loss_dict.items()]))
 
             loss = sum(l for l in loss_dict.values())
             loss_value = loss.item()
@@ -131,3 +140,8 @@ if __name__ == '__main__':
                 print(f"[Epoch {epoch}] {iteration}/{epoch_iterations} --> Loss: {mean_loss/num_losses}")
                 mean_loss = 0.0
                 num_losses = 0
+
+    print("FINISHED TRAINING")
+    if save_model_to != "":
+        torch.save(model.state_dict(), save_model_to)
+        print("SAVED MODEL")

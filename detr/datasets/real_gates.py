@@ -155,10 +155,10 @@ class Resize(object):
             boxes = target['boxes']
             n_boxes = []
             for box in boxes:
-                x0 = int(box[0] / width * n_width)
-                y0 = int(box[1] / height * n_height)
-                x1 = int(box[2] / width * n_width)
-                y1 = int(box[3] / height * n_height)
+                x0 = box[0] / width * n_width
+                y0 = box[1] / height * n_height
+                x1 = box[2] / width * n_width
+                y1 = box[3] / height * n_height
                 n_boxes.append([x0, y0, x1, y1])
             upd['boxes'] = torch.tensor(n_boxes, dtype=torch.float32)
 
@@ -191,6 +191,7 @@ def fix_bbox(bbox: list) -> list:
     max_x = max([bbox[0], bbox[2]])
     min_y = min([bbox[1], bbox[3]])
     max_y = max([bbox[1], bbox[3]])
+
     return [min_x, min_y, max_x, max_y]
 
 
@@ -199,15 +200,15 @@ class RealGatesDS(torch.utils.data.Dataset):
     img_extension = '.jpg'
 
     folders = {
-        "basement_course1": ".xml",
-        "basement_course3": ".xml",
+        # "basement_course1": ".xml",
+        # "basement_course3": ".xml",
         # "bebop_merge": ".xml",
         # "bebop_merge_distort": ".xml",
         # "cyberzoo": ".xml",
-        "daylight15k": ".xml",
-        "daylight_course1": ".xml",
-        "daylight_course3": ".xml",
-        "daylight_course5": ".xml",
+        # "daylight15k": ".xml",
+        # "daylight_course1": ".xml",
+        # "daylight_course3": ".xml",
+        # "daylight_course5": ".xml",
         # "daylight_flight": ".xml",
         # "eth": ".pkl",
         # "google_merge_distort": ".xml",
@@ -216,7 +217,7 @@ class RealGatesDS(torch.utils.data.Dataset):
         "iros2018_course5": ".xml",
         "iros2018_flights": ".xml",
         "iros2018_frontal": ".xml",
-        "random_flight": ".xml"
+        # "random_flight": ".xml"
     }
 
     # orders = {
@@ -243,7 +244,7 @@ class RealGatesDS(torch.utils.data.Dataset):
     std_transform = T.Compose([
         ToTensor(),
         Resize((256, 256)),
-        RandomFlip(p=0.0)
+        RandomFlip(p=0.5)
         # Brightness(p=0.1, brightness=2),
         # Contrast(p=0.1, contrast=2),
         # Saturation(p=0.1, saturation=2),
@@ -345,10 +346,9 @@ class RealGatesDS(torch.utils.data.Dataset):
             gate_corners_dict = {}
 
             for corner in obj.find('gate_corners')[:4]:
-                x_y = [
-                    float(corner.text.split(',')[0]) / width,
-                    (height - float(corner.text.split(',')[1])) / height
-                ]
+                x = float(corner.text.split(',')[0]) / width
+                y = (height - float(corner.text.split(',')[1])) / height
+                x_y = [x, y]
                 gate_corners_dict[corner.tag] = x_y
 
             # This is done to follow the usual convention of starting with the BL corner and go clockwise
@@ -367,7 +367,7 @@ class RealGatesDS(torch.utils.data.Dataset):
             if self.mask_rcnn:
                 corners = obj.find('bndbox')
                 assert corners is not None
-                box_corners = [int(corner.text) for corner in corners]
+                box_corners = [float(corner.text) for corner in corners]
                 box_corners[1] = height - box_corners[1]
                 box_corners[3] = height - box_corners[3]
                 box_corners = fix_bbox(box_corners)
@@ -397,7 +397,7 @@ class RealGatesDS(torch.utils.data.Dataset):
             }
         else:
             target = {
-                'boxes': torch.clamp(torch.tensor(gates, dtype=torch.float32), min=0.0),
+                'boxes': torch.tensor(gates, dtype=torch.float32),
                 'labels': torch.tensor([0 for _ in range(len(gates))], dtype=torch.int64),
                 'image_id': torch.tensor([len(gates)], dtype=torch.int64),
                 'area': torch.tensor(areas, dtype=torch.float32),
@@ -415,9 +415,16 @@ class RealGatesDS(torch.utils.data.Dataset):
 
         ###############################
 
-        mask_dict = {
-            'masks': get_masks(target)
-        }
+        mask_dict = {}
+        masks = get_masks(target)
+        if self.mask_rcnn:
+            mask_dict['boxes'] = torch.clamp(target['boxes'], min=0.0)
+            mask_dict['gates'] = torch.clamp(target['gates'], min=0.0, max=1.0)
+        else:
+            mask_dict['boxes'] = torch.clamp(target['boxes'], min=0.0, max=1.0)
+
+        mask_dict['masks'] = masks
+
         target.update(mask_dict)
 
         return img, target
