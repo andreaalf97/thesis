@@ -192,6 +192,12 @@ def fix_bbox(bbox: list) -> list:
     min_y = min([bbox[1], bbox[3]])
     max_y = max([bbox[1], bbox[3]])
 
+    if abs(min_x - max_x) < 0.1:
+        max_x += 3
+
+    if abs(min_y - max_y) < 0.1:
+        max_y += 3
+
     return [min_x, min_y, max_x, max_y]
 
 
