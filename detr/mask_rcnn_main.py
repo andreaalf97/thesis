@@ -78,7 +78,7 @@ if __name__ == '__main__':
     path = "/tudelft.net/staff-bulk/ewi/insy/VisionLab/yanconglin/dataset/gate_samples"
     save_model_to = "/home/nfs/andreaalfieria/thesis/detr/tmp/test_maskrcnn.pth"
     num_epochs = 2
-    batch_size = 16
+    batch_size = 8
 
     #############################################
     ds = get_mask_rcnn_dataset(path, backup_list_path="/home/nfs/andreaalfieria/thesis/detr/real_gates_lists/all_daylight_all_iros.pkl")
