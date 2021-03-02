@@ -331,7 +331,7 @@ class RealGatesDS(torch.utils.data.Dataset):
             object..
         """
 
-        item_path = self.files[item][0]
+        item_path = self.files[item]
 
         # Open the image as PIL
         img = Image.open(item_path.replace('.xml', '.jpg'))
