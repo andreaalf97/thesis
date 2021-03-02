@@ -303,7 +303,7 @@ class RealGatesDS(torch.utils.data.Dataset):
                     if num_gates > 0:
                         min_gates = num_gates if num_gates < min_gates else min_gates
                         max_gates = num_gates if num_gates > max_gates else max_gates
-                        img = Image.open(file)
+                        img = Image.open(join(folder_path, file))
                         width, height = img.size
                         shape = (height, width)
                         self.files.append((xml_path, shape))
