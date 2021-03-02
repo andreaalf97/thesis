@@ -143,14 +143,19 @@ if __name__ == '__main__':
             images = list(i.to(device) for i in images)
             targets = [{k: v.to(device) for k, v in dictionary.items()} for dictionary in targets]
 
+            print("Images and targets loaded")
+
             # show_batch(images, targets, show_mask=True)
             # exit(0)
 
             loss_dict = model(images, targets)
+            print("Computed loss_dict")
             # print('\n'.join([str(k) + ' --> ' + str(v) for k, v in loss_dict.items()]))
 
             loss = sum(l for l in loss_dict.values())
             loss_value = loss.item()
+
+            print("Total loss is", loss_value)
 
             if not math.isfinite(loss_value):
                 print("Loss is {}, stopping training".format(loss_value))
@@ -160,6 +165,8 @@ if __name__ == '__main__':
             loss.backward()
             optimizer.step()
             lr_scheduler.step()
+
+            print("Computed all backward steps")
 
             mean_loss += loss.item()
             num_losses += 1

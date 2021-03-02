@@ -441,11 +441,13 @@ class RealGatesDS(torch.utils.data.Dataset):
 
 if __name__ == '__main__':
 
-    ds = RealGatesDS(
-        "/home/andreaalf/Documents/thesis/datasets/gate_full_sample",
-        image_set='train',
-        mask_rcnn=False
-    )
+    # ds = RealGatesDS(
+    #     "/home/andreaalf/Documents/thesis/datasets/gate_full_sample",
+    #     image_set='train',
+    #     mask_rcnn=False
+    # )
+
+    ds = RealGatesDS("/home/andreaalf/Documents/thesis/datasets/gate_full_sample", 'train', backup_list_path='', mask_rcnn=True)
 
     for i, (img, target) in enumerate(ds):
         plt.imshow(img.cpu().permute(1, 2, 0))
