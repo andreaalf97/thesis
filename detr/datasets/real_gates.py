@@ -211,11 +211,11 @@ class RealGatesDS(torch.utils.data.Dataset):
         # "bebop_merge": ".xml",
         # "bebop_merge_distort": ".xml",
         # "cyberzoo": ".xml",
-        # "daylight15k": ".xml",
-        # "daylight_course1": ".xml",
-        # "daylight_course3": ".xml",
-        # "daylight_course5": ".xml",
-        # "daylight_flight": ".xml",
+        "daylight15k": ".xml",
+        "daylight_course1": ".xml",
+        "daylight_course3": ".xml",
+        "daylight_course5": ".xml",
+        "daylight_flight": ".xml",
         # "eth": ".pkl",
         # "google_merge_distort": ".xml",
         "iros2018_course1": ".xml",
@@ -303,7 +303,10 @@ class RealGatesDS(torch.utils.data.Dataset):
                     if num_gates > 0:
                         min_gates = num_gates if num_gates < min_gates else min_gates
                         max_gates = num_gates if num_gates > max_gates else max_gates
-                        self.files.append(xml_path)
+                        img = Image.open(file)
+                        width, height = img.size
+                        shape = (height, width)
+                        self.files.append((xml_path, shape))
 
         if backup_list_path != '':
             print(f"[RG DATASET] Saving a copy of the list at {backup_list_path}")
@@ -315,6 +318,9 @@ class RealGatesDS(torch.utils.data.Dataset):
 
     def __len__(self):
         return len(self.files)
+
+    def get_height_and_width(self, index):
+        return self.files[index][1]
 
     def __getitem__(self, item):
         """XML CONVENTION
@@ -328,7 +334,7 @@ class RealGatesDS(torch.utils.data.Dataset):
             object..
         """
 
-        item_path = self.files[item]
+        item_path = self.files[item][0]
 
         # Open the image as PIL
         img = Image.open(item_path.replace('.xml', '.jpg'))
