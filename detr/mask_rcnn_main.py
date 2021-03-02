@@ -58,10 +58,30 @@ def get_instance_segmentation_model(num_classes):
 
 
 def collate(data):
+    return tuple(zip(*data))
     """data is a list of lenght BATCH_SIZE of tuples"""
     imgs = [img for img, _ in data]
     targets = [t for _, t in data]
     return imgs, targets
+
+
+def test_forward():
+    model = torchvision.models.detection.fasterrcnn_resnet50_fpn(pretrained=True)
+    dataset = get_mask_rcnn_dataset('/home/andreaalf/Documents/thesis/datasets/gate')
+    data_loader = torch.utils.data.DataLoader(
+        dataset, batch_size=2, shuffle=False, num_workers=4,
+        collate_fn=collate)
+    # For Training
+    images, targets = next(iter(data_loader))
+    images = list(image for image in images)
+    targets = [{k: v for k, v in t.items()} for t in targets]
+    output = model(images, targets)  # Returns losses and detections
+    print("OUT:", output)
+    # For inference
+    model.eval()
+    x = [torch.rand(3, 300, 400), torch.rand(3, 500, 400)]
+    predictions = model(x)  # Returns predictions
+    print("EVAL:", predictions)
 
 
 if __name__ == '__main__':
@@ -76,19 +96,24 @@ if __name__ == '__main__':
     num_classes = 2
 
     path = "/tudelft.net/staff-bulk/ewi/insy/VisionLab/yanconglin/dataset/gate_samples"
+    # path = "/home/andreaalf/Documents/thesis/datasets/gate"
     save_model_to = "/home/nfs/andreaalfieria/thesis/detr/tmp/test_maskrcnn.pth"
-    num_epochs = 2
-    batch_size = 8
+    # save_model_to = ""
+    num_epochs = 1
+    batch_size = 4
 
     #############################################
     ds = get_mask_rcnn_dataset(path, backup_list_path="/home/nfs/andreaalfieria/thesis/detr/real_gates_lists/all_daylight_all_iros.pkl")
+    # ds = get_mask_rcnn_dataset(path, backup_list_path="")
+
+    dataset_size = len(ds)
+    epoch_iterations = math.ceil(dataset_size / batch_size)
 
     data_loader = torch.utils.data.DataLoader(
         ds, batch_size=batch_size, shuffle=False, num_workers=4,
         collate_fn=collate)
 
-    dataset_size = len(ds)
-    epoch_iterations = math.ceil(dataset_size/batch_size)
+
 
     #############################################
 
@@ -106,13 +131,16 @@ if __name__ == '__main__':
                                                    step_size=3,
                                                    gamma=0.1)
 
+    print("Start training...")
     model.train()
     for epoch in range(num_epochs):
+        print("EPOCH", epoch)
         mean_loss = 0.0
         num_losses = 0
-        for iteration, (images, targets) in enumerate(data_loader):
+        iteration = 0
+        for images, targets in data_loader:
 
-            images = [i.to(device) for i in images]
+            images = list(i.to(device) for i in images)
             targets = [{k: v.to(device) for k, v in dictionary.items()} for dictionary in targets]
 
             # show_batch(images, targets, show_mask=True)
@@ -135,10 +163,11 @@ if __name__ == '__main__':
 
             mean_loss += loss.item()
             num_losses += 1
-            if iteration % (epoch_iterations/10) == 0:
+            if iteration % int(epoch_iterations/10) == 0:
                 print(f"[Epoch {epoch}] {iteration}/{epoch_iterations} --> Loss: {mean_loss/num_losses}")
                 mean_loss = 0.0
                 num_losses = 0
+            iteration += 1
 
     print("FINISHED TRAINING")
     if save_model_to != "":
