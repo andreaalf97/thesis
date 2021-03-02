@@ -320,7 +320,7 @@ class RealGatesDS(torch.utils.data.Dataset):
         return len(self.files)
 
     def get_height_and_width(self, index):
-        return self.files[index][1]
+        return 256, 256
 
     def __getitem__(self, item):
         """XML CONVENTION
