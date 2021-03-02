@@ -92,6 +92,7 @@ if __name__ == '__main__':
     random.seed(seed)
 
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+    print("RUNNING ON", device)
 
     num_classes = 2
 
@@ -103,8 +104,13 @@ if __name__ == '__main__':
     batch_size = 4
 
     #############################################
-    # ds = get_mask_rcnn_dataset(path, backup_list_path="/home/nfs/andreaalfieria/thesis/detr/real_gates_lists/all_daylight_all_iros.pkl")
-    ds = get_mask_rcnn_dataset(path, backup_list_path="")
+    ds = get_mask_rcnn_dataset(
+        path,
+        backup_list_path="/home/nfs/andreaalfieria/thesis/detr/real_gates_lists/all_daylight.pkl"
+    )
+    # ds = get_mask_rcnn_dataset(path, backup_list_path="")
+
+    exit(0)
 
     dataset_size = len(ds)
     epoch_iterations = math.ceil(dataset_size / batch_size)
