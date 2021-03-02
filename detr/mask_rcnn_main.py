@@ -59,9 +59,8 @@ def get_instance_segmentation_model(num_classes):
 
 def collate(data):
     """data is a list of lenght BATCH_SIZE of tuples"""
-
-    imgs = [img for img, target in data]
-    targets = [t for img, t in data]
+    imgs = [img for img, _ in data]
+    targets = [t for _, t in data]
     return imgs, targets
 
 
@@ -76,10 +75,10 @@ if __name__ == '__main__':
 
     num_classes = 2
 
-    path = "/home/andreaalf/Documents/thesis/datasets/gate_full_sample"
-    save_model_to = ""
-    num_epochs = 10
-    batch_size = 8
+    path = "/tudelft.net/staff-bulk/ewi/insy/VisionLab/yanconglin/dataset/gate_samples"
+    save_model_to = "/home/nfs/andreaalfieria/thesis/detr/tmp/test_maskrcnn.pth"
+    num_epochs = 2
+    batch_size = 16
 
     #############################################
     ds = get_mask_rcnn_dataset(path)
@@ -116,8 +115,8 @@ if __name__ == '__main__':
             images = [i.to(device) for i in images]
             targets = [{k: v.to(device) for k, v in dictionary.items()} for dictionary in targets]
 
-            show_batch(images, targets, show_mask=True)
-            exit(0)
+            # show_batch(images, targets, show_mask=True)
+            # exit(0)
 
             loss_dict = model(images, targets)
             # print('\n'.join([str(k) + ' --> ' + str(v) for k, v in loss_dict.items()]))
