@@ -81,10 +81,10 @@ if __name__ == '__main__':
     batch_size = 16
 
     #############################################
-    ds = get_mask_rcnn_dataset(path)
+    ds = get_mask_rcnn_dataset(path, backup_list_path="/home/nfs/andreaalfieria/thesis/detr/real_gates_lists/all_daylight_all_iros.pkl")
 
     data_loader = torch.utils.data.DataLoader(
-        ds, batch_size=batch_size, shuffle=True, num_workers=4,
+        ds, batch_size=batch_size, shuffle=False, num_workers=4,
         collate_fn=collate)
 
     dataset_size = len(ds)
