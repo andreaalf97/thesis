@@ -103,8 +103,8 @@ if __name__ == '__main__':
     batch_size = 4
 
     #############################################
-    ds = get_mask_rcnn_dataset(path, backup_list_path="/home/nfs/andreaalfieria/thesis/detr/real_gates_lists/all_daylight_all_iros.pkl")
-    # ds = get_mask_rcnn_dataset(path, backup_list_path="")
+    # ds = get_mask_rcnn_dataset(path, backup_list_path="/home/nfs/andreaalfieria/thesis/detr/real_gates_lists/all_daylight_all_iros.pkl")
+    ds = get_mask_rcnn_dataset(path, backup_list_path="")
 
     dataset_size = len(ds)
     epoch_iterations = math.ceil(dataset_size / batch_size)
