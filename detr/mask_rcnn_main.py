@@ -94,14 +94,14 @@ if __name__ == '__main__':
     num_classes = 2
 
     path = "/tudelft.net/staff-bulk/ewi/insy/VisionLab/yanconglin/dataset/gate_samples"
-    pkl_path = "/home/nfs/andreaalfieria/basement_daylight_iros_random.pkl"
+    pkl_path = "/home/nfs/andreaalfieria/daylight.pkl"
     # path = "/home/andreaalf/Documents/thesis/datasets/gate_samples"
     # pkl_path = "/home/andreaalf/Documents/thesis/datasets/basement.pkl"
 
     # save_model_to = "/home/nfs/andreaalfieria/thesis/detr/tmp/test_maskrcnn.pth"
     save_model_to = ""
     num_epochs = 1
-    batch_size = 8
+    batch_size = 16
 
     #############################################
     ds = get_mask_rcnn_dataset(
