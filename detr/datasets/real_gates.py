@@ -113,8 +113,8 @@ class RealGatesDS(torch.utils.data.Dataset):
     std_transforms = T.Compose([
         ToTensor(),
         Resize((256, 256)),
-        AddGaussianNoise(prob=0.2),
-        Hue(prob=0.2)
+        AddGaussianNoise(prob=0.1),
+        Hue(prob=0.1)
     ])
 
     def __init__(self, dataset_path, pkl_path, image_set='train', transform=None, mask_rcnn=False):
