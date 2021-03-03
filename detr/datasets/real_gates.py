@@ -108,7 +108,6 @@ class Hue(object):
         return img, target
 
 
-
 class RealGatesDS(torch.utils.data.Dataset):
 
     std_transforms = T.Compose([
@@ -125,7 +124,7 @@ class RealGatesDS(torch.utils.data.Dataset):
 
         image_set = 'train' if 'val' in image_set else image_set
 
-        print("INITIALIZING Real Gates dataset")
+        print("[RG DATASET] Initializing Real Gates dataset")
         self.dataset_path = dataset_path
         self.transform = transform if transform is not None else self.std_transforms
         self.mask_rcnn = mask_rcnn
@@ -140,6 +139,7 @@ class RealGatesDS(torch.utils.data.Dataset):
                 self.df = self.df.append(tmp_df, ignore_index=True)
 
         self.df = self.df[self.df['split'] == image_set]
+        print(f"[RG DATASET] Loaded {len(self.df)} images for {image_set} split")
 
     def __len__(self):
         return len(self.df)

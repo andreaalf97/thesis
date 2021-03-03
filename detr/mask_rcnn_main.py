@@ -97,20 +97,19 @@ if __name__ == '__main__':
     num_classes = 2
 
     path = "/tudelft.net/staff-bulk/ewi/insy/VisionLab/yanconglin/dataset/gate_samples"
+    pkl_path = "/home/nfs/andreaalfieria/basement.pkl"
     # path = "/home/andreaalf/Documents/thesis/datasets/gate"
-    save_model_to = "/home/nfs/andreaalfieria/thesis/detr/tmp/test_maskrcnn.pth"
-    # save_model_to = ""
+    # save_model_to = "/home/nfs/andreaalfieria/thesis/detr/tmp/test_maskrcnn.pth"
+    save_model_to = ""
     num_epochs = 1
     batch_size = 8
 
     #############################################
     ds = get_mask_rcnn_dataset(
         path,
-        backup_list_path="/home/nfs/andreaalfieria/thesis/detr/real_gates_lists/all_daylight.pkl"
+        pkl_path=pkl_path
     )
     # ds = get_mask_rcnn_dataset(path, backup_list_path="")
-
-    exit(0)
 
     dataset_size = len(ds)
     epoch_iterations = math.ceil(dataset_size / batch_size)
@@ -118,8 +117,6 @@ if __name__ == '__main__':
     data_loader = torch.utils.data.DataLoader(
         ds, batch_size=batch_size, shuffle=False, num_workers=4,
         collate_fn=collate)
-
-
 
     #############################################
 
@@ -149,19 +146,14 @@ if __name__ == '__main__':
             images = list(i.to(device) for i in images)
             targets = [{k: v.to(device) for k, v in dictionary.items()} for dictionary in targets]
 
-            print("Images and targets loaded")
-
             # show_batch(images, targets, show_mask=True)
             # exit(0)
 
             loss_dict = model(images, targets)
-            print("Computed loss_dict")
             # print('\n'.join([str(k) + ' --> ' + str(v) for k, v in loss_dict.items()]))
 
             loss = sum(l for l in loss_dict.values())
             loss_value = loss.item()
-
-            print("Total loss is", loss_value)
 
             if not math.isfinite(loss_value):
                 print("Loss is {}, stopping training".format(loss_value))

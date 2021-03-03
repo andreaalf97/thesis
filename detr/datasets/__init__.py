@@ -31,9 +31,9 @@ def build_dataset(image_set, args):
             return TSDataset(256, 256, num_gates=int(args.num_gates),
                              rand_gate_number=True, black_and_white=(not args.colored))
     if args.dataset_file == 'real_gates':
-        return RealGatesDS(args.real_gate_path, image_set, backup_list_path=args.backup_rg_list)
+        return RealGatesDS(args.real_gate_path, pkl_path=args.real_gate_pickle_path, image_set=image_set)
     raise ValueError(f'dataset {args.dataset_file} not supported')
 
 
-def get_mask_rcnn_dataset(path: str, backup_list_path=''):
-    return RealGatesDS(path, 'train', backup_list_path=backup_list_path, mask_rcnn=True)
+def get_mask_rcnn_dataset(path: str, pkl_path: str):
+    return RealGatesDS(dataset_path=path, pkl_path=pkl_path, image_set='train', mask_rcnn=True)
