@@ -60,10 +60,6 @@ def get_instance_segmentation_model(num_classes):
 
 def collate(data):
     return tuple(zip(*data))
-    # """data is a list of lenght BATCH_SIZE of tuples"""
-    # imgs = [img for img, _ in data]
-    # targets = [t for _, t in data]
-    # return imgs, targets
 
 
 def test_forward():
@@ -98,13 +94,13 @@ if __name__ == '__main__':
     num_classes = 2
 
     path = "/tudelft.net/staff-bulk/ewi/insy/VisionLab/yanconglin/dataset/gate_samples"
-    pkl_path = "/home/nfs/andreaalfieria/basement.pkl"
+    pkl_path = "/home/nfs/andreaalfieria/basement_daylight_iros_random.pkl"
     # path = "/home/andreaalf/Documents/thesis/datasets/gate_samples"
     # pkl_path = "/home/andreaalf/Documents/thesis/datasets/basement.pkl"
 
     # save_model_to = "/home/nfs/andreaalfieria/thesis/detr/tmp/test_maskrcnn.pth"
     save_model_to = ""
-    num_epochs = 5
+    num_epochs = 1
     batch_size = 8
 
     #############################################
