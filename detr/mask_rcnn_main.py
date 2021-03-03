@@ -101,7 +101,7 @@ if __name__ == '__main__':
     save_model_to = "/home/nfs/andreaalfieria/thesis/detr/tmp/test_maskrcnn.pth"
     # save_model_to = ""
     num_epochs = 1
-    batch_size = 4
+    batch_size = 8
 
     #############################################
     ds = get_mask_rcnn_dataset(
