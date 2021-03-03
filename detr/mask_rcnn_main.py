@@ -1,5 +1,6 @@
 from datasets import get_mask_rcnn_dataset
 
+import time
 import torch
 import torchvision
 import numpy as np
@@ -103,8 +104,8 @@ if __name__ == '__main__':
 
     # save_model_to = "/home/nfs/andreaalfieria/thesis/detr/tmp/test_maskrcnn.pth"
     save_model_to = ""
-    num_epochs = 1
-    batch_size = 4
+    num_epochs = 5
+    batch_size = 8
 
     #############################################
     ds = get_mask_rcnn_dataset(
@@ -135,15 +136,17 @@ if __name__ == '__main__':
                                                    step_size=3,
                                                    gamma=0.1)
 
+    ex_times = []
+
     print("Start training...")
     model.train()
     for epoch in range(num_epochs):
+        start = time.time()
         print("EPOCH", epoch)
         mean_loss = 0.0
         num_losses = 0
         iteration = 0
         for images, targets in data_loader:
-
             images = list(i.to(device) for i in images)
             targets = [{k: v.to(device) for k, v in dictionary.items()} for dictionary in targets]
 
@@ -172,8 +175,12 @@ if __name__ == '__main__':
                 mean_loss = 0.0
                 num_losses = 0
             iteration += 1
+        end = time.time()
+        print(f"{end-start}s for this epoch")
+        ex_times.append(end-start)
 
     print("FINISHED TRAINING")
+    print("Average training time: %.4f s/epoch" % (sum(ex_times)/num_epochs))
     if save_model_to != "":
         torch.save(model.state_dict(), save_model_to)
         print("SAVED MODEL")
