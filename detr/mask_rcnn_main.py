@@ -101,7 +101,7 @@ if __name__ == '__main__':
     # save_model_to = "/home/nfs/andreaalfieria/thesis/detr/tmp/test_maskrcnn.pth"
     save_model_to = ""
     num_epochs = 1
-    batch_size = 16
+    batch_size = 8
 
     #############################################
     ds = get_mask_rcnn_dataset(
@@ -133,6 +133,7 @@ if __name__ == '__main__':
                                                    gamma=0.1)
 
     ex_times = []
+    load_times = []
 
     print("Start training...")
     model.train()
@@ -142,7 +143,11 @@ if __name__ == '__main__':
         mean_loss = 0.0
         num_losses = 0
         iteration = 0
+
+        start_loader = time.time()
         for images, targets in data_loader:
+            load_times.append(time.time()-start_loader)
+
             images = list(i.to(device) for i in images)
             targets = [{k: v.to(device) for k, v in dictionary.items()} for dictionary in targets]
 
@@ -171,12 +176,15 @@ if __name__ == '__main__':
                 mean_loss = 0.0
                 num_losses = 0
             iteration += 1
+            start_loader = time.time()
+
         end = time.time()
         print(f"{end-start}s for this epoch")
         ex_times.append(end-start)
 
     print("FINISHED TRAINING")
     print("Average training time: %.4f s/epoch" % (sum(ex_times)/num_epochs))
+    print("Average sample loading time: %.4f s/batch" % (sum(load_times)/len(load_times)))
     if save_model_to != "":
         torch.save(model.state_dict(), save_model_to)
         print("SAVED MODEL")
