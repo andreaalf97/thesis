@@ -99,7 +99,7 @@ if __name__ == '__main__':
     # path = "/home/andreaalf/Documents/thesis/datasets/gate_samples"
     # pkl_path = "/home/andreaalf/Documents/thesis/datasets/normalized_train_8000imgs.pkl"
 
-    save_model_to = "/home/nfs/andreaalfieria/thesis/detr/tmp/maskrcnn_uniform8000_300epochs.pth"
+    save_model_to = "/home/nfs/andreaalfieria/thesis/detr/tmp/maskrcnn_uniform8000_300epochs_LR1e4.pth"
     # save_model_to = ""
     num_epochs = 300
     batch_size = 8
