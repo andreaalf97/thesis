@@ -122,7 +122,7 @@ class RealGatesDS(torch.utils.data.Dataset):
         assert isinstance(pkl_path, (str, list))
         assert image_set in ('train', 'val')
 
-        image_set = 'train' if 'val' in image_set else image_set
+        image_set = 'test' if 'val' in image_set else image_set
 
         print("[RG DATASET] Initializing Real Gates dataset")
         self.dataset_path = dataset_path
