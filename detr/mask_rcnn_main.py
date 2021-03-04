@@ -128,7 +128,7 @@ if __name__ == '__main__':
     optimizer = torch.optim.SGD(params, lr=learning_rate,
                                 momentum=0.9, weight_decay=0.0005)
 
-    # The scheduler drops the learning rate by 10 every 10 epochs
+    # The scheduler drops the learning rate by 10 every 80 epochs
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer,
                                                    step_size=80,
                                                    gamma=0.1)
