@@ -99,11 +99,11 @@ if __name__ == '__main__':
     # path = "/home/andreaalf/Documents/thesis/datasets/gate_samples"
     # pkl_path = "/home/andreaalf/Documents/thesis/datasets/normalized_train_8000imgs.pkl"
 
-    save_model_to = "/home/nfs/andreaalfieria/thesis/detr/tmp/maskrcnn_uniform8000_100epochs.pth"
+    save_model_to = "/home/nfs/andreaalfieria/thesis/detr/tmp/maskrcnn_uniform8000_300epochs.pth"
     # save_model_to = ""
-    num_epochs = 100
+    num_epochs = 300
     batch_size = 8
-    learning_rate = 0.005
+    learning_rate = 0.001
 
     #############################################
     ds = get_mask_rcnn_dataset(
@@ -131,7 +131,7 @@ if __name__ == '__main__':
 
     # The scheduler drops the learning rate by 10 every 80 epochs
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer,
-                                                   step_size=80,
+                                                   step_size=200,
                                                    gamma=0.1)
 
     ex_times = []
