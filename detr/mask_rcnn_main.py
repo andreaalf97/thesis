@@ -104,7 +104,7 @@ if __name__ == '__main__':
     num_epochs = 300
     batch_size = 8
     # learning_rate = 0.005  DEFAULT
-    learning_rate = 0.001
+    learning_rate = 1e-4
 
     #############################################
     ds = get_mask_rcnn_dataset(
