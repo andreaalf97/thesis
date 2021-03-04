@@ -101,7 +101,7 @@ if __name__ == '__main__':
 
     save_model_to = "/home/nfs/andreaalfieria/thesis/detr/tmp/maskrcnn_uniform8000_100epochs.pth"
     # save_model_to = ""
-    num_epochs = 1
+    num_epochs = 100
     batch_size = 8
     learning_rate = 0.005
 
