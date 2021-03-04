@@ -89,7 +89,7 @@ def get_args_parser():
     parser.add_argument('--real_gate_path', type=str,
                         default="/home/andreaalf/Documents/thesis/datasets/gate_samples"
                         )
-    parser.add_argument('--real_gate_pickle_path', type=str, default="/home/andreaalf/Documents/thesis/datasets/basement.pkl")
+    parser.add_argument('--real_gate_pickle_path', type=str, default="/home/andreaalf/Documents/thesis/datasets/normalized_train_8000imgs.pkl")
 
 
     parser.add_argument('--output_dir', default='',
