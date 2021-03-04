@@ -89,6 +89,7 @@ if __name__ == '__main__':
     random.seed(seed)
 
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+    # device = torch.device('cpu')
     print("RUNNING ON", device)
 
     num_classes = 2
@@ -96,7 +97,7 @@ if __name__ == '__main__':
     path = "/tudelft.net/staff-bulk/ewi/insy/VisionLab/yanconglin/dataset/gate_samples"
     pkl_path = "/home/nfs/andreaalfieria/normalized_train_8000imgs.pkl"
     # path = "/home/andreaalf/Documents/thesis/datasets/gate_samples"
-    # pkl_path = "/home/andreaalf/Documents/thesis/datasets/basement.pkl"
+    # pkl_path = "/home/andreaalf/Documents/thesis/datasets/normalized_train_8000imgs.pkl"
 
     # save_model_to = "/home/nfs/andreaalfieria/thesis/detr/tmp/test_maskrcnn.pth"
     save_model_to = ""
