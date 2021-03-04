@@ -94,7 +94,7 @@ if __name__ == '__main__':
     num_classes = 2
 
     path = "/tudelft.net/staff-bulk/ewi/insy/VisionLab/yanconglin/dataset/gate_samples"
-    pkl_path = "/home/nfs/andreaalfieria/daylight.pkl"
+    pkl_path = "/home/nfs/andreaalfieria/normalized_train_8000imgs.pkl"
     # path = "/home/andreaalf/Documents/thesis/datasets/gate_samples"
     # pkl_path = "/home/andreaalf/Documents/thesis/datasets/basement.pkl"
 
@@ -102,6 +102,7 @@ if __name__ == '__main__':
     save_model_to = ""
     num_epochs = 1
     batch_size = 8
+    learning_rate = 0.005
 
     #############################################
     ds = get_mask_rcnn_dataset(
@@ -113,7 +114,7 @@ if __name__ == '__main__':
     epoch_iterations = math.ceil(dataset_size / batch_size)
 
     data_loader = torch.utils.data.DataLoader(
-        ds, batch_size=batch_size, shuffle=False, num_workers=4,
+        ds, batch_size=batch_size, shuffle=True, num_workers=4,
         collate_fn=collate)
 
     #############################################
@@ -124,12 +125,12 @@ if __name__ == '__main__':
     #############################################
 
     params = [p for p in model.parameters() if p.requires_grad]
-    optimizer = torch.optim.SGD(params, lr=0.005,
+    optimizer = torch.optim.SGD(params, lr=learning_rate,
                                 momentum=0.9, weight_decay=0.0005)
 
     # The scheduler drops the learning rate by 10 every 10 epochs
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer,
-                                                   step_size=3,
+                                                   step_size=80,
                                                    gamma=0.1)
 
     ex_times = []
@@ -167,16 +168,17 @@ if __name__ == '__main__':
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            lr_scheduler.step()
 
             mean_loss += loss.item()
             num_losses += 1
             if iteration % int(epoch_iterations/10) == 0:
-                print(f"[Epoch {epoch}] {iteration}/{epoch_iterations} --> Loss: {mean_loss/num_losses}")
+                print(f"[Epoch {epoch}] {iteration}/{epoch_iterations}, LR:{lr_scheduler.get_last_lr()} --> Loss: {mean_loss/num_losses}")
                 mean_loss = 0.0
                 num_losses = 0
             iteration += 1
             start_loader = time.time()
+
+        lr_scheduler.step()
 
         end = time.time()
         print(f"{end-start}s for this epoch")
