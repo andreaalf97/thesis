@@ -102,16 +102,20 @@ if __name__ == '__main__':
 
     #############################################
     # EVALUATION PARAMETERS
-    # Delete this for no evaluation
-    eval_model = "/home/andreaalf/Documents/thesis/detr/results/baseline_comparison/maskrcnn_uniform8000_100epochs.pth"
-    # eval_model = ""
-    eval_pkl_path = "/home/andreaalf/Documents/thesis/datasets/normalized_test_2000imgs.pkl"
+    # Comment this out for no evaluation
+    eval_model = "/home/nfs/andreaalfieria/thesis/detr/tmp/maskrcnn_uniform8000_100epochs.pth"
+    eval_pkl_path = "/home/nfs/andreaalfieria/normalized_test_2000imgs.pkl"
+    save_results_to = "/home/nfs/andreaalfieria/thesis/detr/tmp/EVAL_maskrcnn_uniform8000_100epochs_IOU50.pkl"
+
     if eval_model != "":
         baseline.evaluate(
             model=get_instance_segmentation_model(num_classes),
             pkl_path=eval_pkl_path,
             pretrained_model=eval_model,
-            ds_func=get_mask_rcnn_dataset
+            ds_func=get_mask_rcnn_dataset,
+            ds_path=path,
+            save_results_to=save_results_to,
+            device=device
         )
         exit(0)
     #############################################

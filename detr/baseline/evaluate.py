@@ -50,11 +50,7 @@ def match_masks_optim(gt_masks, pred_masks):
 
 
 @torch.no_grad()
-def evaluate(model, pkl_path, pretrained_model, ds_func):
-
-    ds_path = "/home/andreaalf/Documents/thesis/datasets/gate_samples"
-    save_results_to = "/home/andreaalf/Documents/thesis/detr/results/baseline_comparison/EVAL_maskrcnn_uniform8000_100epochs_IOU50.pkl"
-    device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+def evaluate(model, pkl_path, pretrained_model, ds_func, ds_path, save_results_to, device):
 
     model.to(device)
     model.load_state_dict(torch.load(pretrained_model))
@@ -69,7 +65,7 @@ def evaluate(model, pkl_path, pretrained_model, ds_func):
     )
 
     data_loader = torch.utils.data.DataLoader(
-        ds, batch_size=4, shuffle=False, num_workers=0,
+        ds, batch_size=8, shuffle=False, num_workers=0,
         collate_fn=collate)
 
     results = pd.DataFrame({
