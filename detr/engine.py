@@ -8,6 +8,7 @@ import sys
 from typing import Iterable
 
 import torch
+from scipy.optimize import linear_sum_assignment
 
 import util.misc as utils
 from datasets.coco_eval import CocoEvaluator
@@ -16,9 +17,10 @@ from datasets.panoptic_eval import PanopticEvaluator
 import matplotlib.pyplot as plt
 from scipy.signal import savgol_filter
 import numpy as np
-from shapely.geometry import Polygon
+from shapely.geometry import MultiPoint
 from shapely.errors import TopologicalError
 import pandas as pd
+from os.path import join
 
 
 def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
@@ -458,19 +460,19 @@ def iou(prediction: torch.Tensor, gt: torch.Tensor) -> float:
     gt_br = [gt[6].item(), gt[7].item()]
 
     try:
-        pred_poly = Polygon([
+        pred_poly = MultiPoint([
             pred_bl,
             pred_tl,
             pred_tr,
             pred_br
-        ])
+        ]).convex_hull
 
-        gt_poly = Polygon([
+        gt_poly = MultiPoint([
             gt_bl,
             gt_tl,
             gt_tr,
             gt_br
-        ])
+        ]).convex_hull
 
         intersection = pred_poly.intersection(gt_poly).area
         union = pred_poly.area + gt_poly.area - intersection
@@ -545,6 +547,38 @@ def plot_loss(output_file: str):
         return
 
 
+def match_predictions_optim(pred_logits: torch.Tensor, pred_boxes: torch.Tensor, gt_boxes: torch.Tensor) -> tuple:
+    """
+        This function matches each ground truth mask with a single mask in the predictions
+    """
+    predictions = []
+    for index, logits in enumerate(pred_logits):
+        confidence, pred_class = torch.max(torch.softmax(logits, dim=0), 0)
+        if pred_class == 0:
+            predictions.append((
+                pred_boxes[index], confidence.item()
+            ))
+
+    cost_matrix = [[0 for _ in range(len(predictions))] for _ in range(len(gt_boxes))]
+    for i, gt_box in enumerate(gt_boxes):  # For each GT mask we find the best match
+        for j, (pred_box, _) in enumerate(predictions):  # For each prediction mask we compare it
+            iou_score = iou(
+                pred_box,
+                gt_box
+            )
+            cost_matrix[i][j] = iou_score
+
+    cost_matrix = np.array(cost_matrix)
+    match = linear_sum_assignment(cost_matrix, maximize=True)
+
+    false_positives = []
+    for index, (p, conf) in enumerate(predictions):
+        if index not in match[1]:  # Prediction not assigned to any GT polygon
+            false_positives.append(conf)
+
+    return [[i, j, cost_matrix[i][j], predictions[j][1]] for i, j in zip(match[0], match[1])], false_positives
+
+
 @torch.no_grad()
 def evaluate_map(model, data_loader_val, device, args):
     assert args.pretrained_model != '', "Give path to pretrained model with --pretrained_model"
@@ -559,14 +593,88 @@ def evaluate_map(model, data_loader_val, device, args):
     model.load_state_dict(state_dict)
     model.eval()
 
-    for samples, targets in data_loader_val:
-        samples = samples.to(device)
+    iou_threshold = float(args.iou_treshold)
+
+    results = pd.DataFrame({
+        'img_id': [],
+        'gt_id': [],
+        'pred_id': [],
+        'confidence': [],
+        'outcome': []
+    })
+    image_objects = pd.DataFrame({
+        'img_id': [],
+        'num_objects': []
+    })
+
+    for iteration, (images, targets) in enumerate(data_loader_val):
+        images = images.to(device)
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
 
-        outputs = model(samples)
+        outputs = model(images)
         outputs = {k: v for k, v in outputs.items() if k != 'aux_outputs'}
 
-        #TODO: continue this
+        for pred_logits, pred_boxes, target in zip(outputs['pred_logits'], outputs['pred_boxes'], targets):  # For each image in the dataset
+
+            # print("pred_logits", pred_logits.shape)
+            # print("pred_boxes", pred_boxes.shape)
+            # print("target:\n" + '\n'.join('   ' + str(k) + ' -> ' + str(target[k].shape) for k in target))
+
+            '''Scores is a list of tuples as long as the objects in the ground truth: (gt_index, pred_index, iou_score)'''
+            scores, false_positives = match_predictions_optim(
+                pred_logits=pred_logits,
+                pred_boxes=pred_boxes,
+                gt_boxes=target['boxes']
+            )
+            img_id = int(target['image_id'].item())
+
+            row = {
+                'img_id': [],
+                'gt_id': [],
+                'pred_id': [],
+                'confidence': [],
+                'outcome': []
+            }
+
+            for gt_index, pred_index, iou_score, confidence in scores:
+                row['img_id'].append(img_id)
+                row['gt_id'].append(int(gt_index))
+                row['pred_id'].append(int(pred_index))
+                row['confidence'].append(confidence)
+                row['outcome'].append(
+                    'TP' if iou_score > iou_threshold else 'FP'
+                )
+            for i, conf in enumerate(false_positives):
+                row['img_id'].append(img_id)
+                row['gt_id'].append(-1)
+                row['pred_id'].append(i)
+                row['confidence'].append(conf)
+                row['outcome'].append('FP')
+
+            results = results.append(pd.DataFrame(row), ignore_index=True)
+            image_objects = image_objects.append(pd.DataFrame({
+                'img_id': [img_id],
+                'num_objects': [len(target['boxes'])]
+            }), ignore_index=True)
+
+        print(f"Iteration {iteration} of {len(data_loader_val)}")
+        print(f"Dataframe size {len(results)}\n#####")
+
+    folder_path = args.pretrained_model.replace(args.pretrained_model.split('/')[-1], '')
+    model_name = args.pretrained_model.split('/')[-1].replace('.pth', '')
+
+    res_path = join(
+        folder_path,
+        "EVAL_" + model_name + ("_IOU" + str(int(iou_threshold*100))) + ".pkl"
+    )
+    ds_info_path = join(
+        folder_path,
+        "DS_INFO_" + model_name + '.pkl'
+    )
+
+    print("SAVING RESULTS TO" + res_path)
+    results.to_pickle(res_path)
+    image_objects.to_pickle(ds_info_path)
 
 @torch.no_grad()
 def evaluate_toy_setting(model, data_loader_val, criterion, device, args):

@@ -30,8 +30,8 @@ def match_masks_optim(gt_masks, pred_masks):
     This function matches each ground truth mask with a single mask in the predictions
     """
     cost_matrix = [[0 for _ in range(len(pred_masks))] for _ in range(len(gt_masks))]
-    for i, gt_mask in enumerate(gt_masks):  # For each GT mask we find the best match
-        for j, pred_mask in enumerate(pred_masks):  # For each prediction mask we compare it
+    for i, gt_mask in enumerate(gt_masks):  # For each GT mask
+        for j, pred_mask in enumerate(pred_masks):  # For each prediction mask
             iou_score = iou(
                 pred_mask,
                 gt_mask
@@ -41,23 +41,26 @@ def match_masks_optim(gt_masks, pred_masks):
     cost_matrix = np.array(cost_matrix)
     match = linear_sum_assignment(cost_matrix, maximize=True)
 
-    return [[i, j, cost_matrix[i][j]] for i, j in zip(match[0], match[1])]
+    false_positives = []
+    for index in range(len(pred_masks)):
+        if index not in match[1]:  # Prediction not assigned to any GT polygon
+            false_positives.append(index)
+
+    return [[i, j, cost_matrix[i][j]] for i, j in zip(match[0], match[1])], false_positives
 
 
 @torch.no_grad()
 def evaluate(model, pkl_path, pretrained_model, ds_func):
 
     ds_path = "/home/andreaalf/Documents/thesis/datasets/gate_samples"
-    save_results_to = "/home/andreaalf/Documents/thesis/detr/results/baseline_comparison/EVAL_maskrcnn_uniform8000_100epochs.pkl"
+    save_results_to = "/home/andreaalf/Documents/thesis/detr/results/baseline_comparison/EVAL_maskrcnn_uniform8000_100epochs_IOU50.pkl"
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
     model.to(device)
     model.load_state_dict(torch.load(pretrained_model))
     model.eval()
 
-    pred_confidence_threshold = 0.5
-    pixel_confidence_threshold = 0.5
-    iou_threshold = 0.8
+    iou_threshold = 0.5
 
     ds = ds_func(
         ds_path,
@@ -66,7 +69,7 @@ def evaluate(model, pkl_path, pretrained_model, ds_func):
     )
 
     data_loader = torch.utils.data.DataLoader(
-        ds, batch_size=2, shuffle=False, num_workers=0,
+        ds, batch_size=4, shuffle=False, num_workers=0,
         collate_fn=collate)
 
     results = pd.DataFrame({
@@ -76,23 +79,20 @@ def evaluate(model, pkl_path, pretrained_model, ds_func):
         'confidence': [],
         'outcome': []
     })
-    total_gt = 0
 
     for iteration, (images, targets) in enumerate(data_loader):
         images = list(i.to(device) for i in images)
         targets = [{k: v.to(device) for k, v in dictionary.items()} for dictionary in targets]
 
         output = model(images)
-        for output_dict, img, target in zip(output, images, targets):  # For each image in the dataset
+        for output_dict, target in zip(output, targets):  # For each image in the dataset
 
             # print('\n'.join(str(k) + ' -- ' + str(output_dict[k].shape) for k in output_dict))
             # print('\n')
             # print('\n'.join(str(k) + ' -- ' + str(target[k].shape) for k in target))
 
-            total_gt += len(target['labels'])
-
             '''Scores is a list of tuples as long as the objects in the ground truth: (gt_index, pred_index, iou_score)'''
-            scores = match_masks_optim(
+            scores, false_positives = match_masks_optim(
                 gt_masks=target['masks'],
                 pred_masks=torch.where(output_dict['masks'] > 0.5, 1, 0)
             )
@@ -106,7 +106,6 @@ def evaluate(model, pkl_path, pretrained_model, ds_func):
                 'outcome': []
             }
 
-            pred_indices = list(range(len(output_dict['labels'])))
             for gt_index, pred_index, iou_score in scores:
                 row['img_id'].append(img_id)
                 row['gt_id'].append(int(gt_index))
@@ -115,13 +114,12 @@ def evaluate(model, pkl_path, pretrained_model, ds_func):
                 row['outcome'].append(
                     'TP' if iou_score > iou_threshold else 'FP'
                 )
-                pred_indices.remove(int(pred_index))
-            for unmatched_pred_index in pred_indices:
+            for index in false_positives:
                 row['img_id'].append(img_id)
                 row['gt_id'].append(-1)
-                row['pred_id'].append(unmatched_pred_index)
-                row['confidence'].append(output_dict['scores'][unmatched_pred_index].item())
-                row['outcome'].append('FN')
+                row['pred_id'].append(index)
+                row['confidence'].append(output_dict['scores'][index].item())
+                row['outcome'].append('FP')
 
             results = results.append(pd.DataFrame(row), ignore_index=True)
 

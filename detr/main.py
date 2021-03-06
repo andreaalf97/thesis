@@ -103,11 +103,10 @@ def get_args_parser():
                         help='start epoch')
 
     parser.add_argument('--eval', action='store_true')
-    parser.add_argument('--pretrained_model', default='tmp/10slots_300epochs_24h.pth')
+    parser.add_argument('--pretrained_model', default='/home/andreaalf/Documents/thesis/detr/results/baseline_comparison/detr_100epochs_uniform8000.pth')
     parser.add_argument('--training_output_file', default='')
     parser.add_argument('--num_gates', default='-1')  # -1 for random number between 1 and 5
-    parser.add_argument('--iou_treshold', default='0.90')
-
+    parser.add_argument('--iou_treshold', default='0.50')
     parser.add_argument('--num_workers', default=2, type=int)
 
     # distributed training parameters
