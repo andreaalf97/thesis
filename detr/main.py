@@ -13,7 +13,7 @@ from torch.utils.data import DataLoader, DistributedSampler
 import datasets
 import util.misc as utils
 from datasets import build_dataset, get_coco_api_from_dataset
-from engine import plot_loss, train_one_epoch, evaluate_toy_setting
+from engine import plot_loss, train_one_epoch, evaluate_toy_setting, evaluate_map
 from models import build_model
 
 
@@ -89,7 +89,7 @@ def get_args_parser():
     parser.add_argument('--real_gate_path', type=str,
                         default="/home/andreaalf/Documents/thesis/datasets/gate_samples"
                         )
-    parser.add_argument('--real_gate_pickle_path', type=str, default="/home/andreaalf/Documents/thesis/datasets/normalized_train_8000imgs.pkl")
+    parser.add_argument('--real_gate_pickle_path', type=str, default="/home/andreaalf/Documents/thesis/datasets/normalized_test_2000imgs.pkl")
 
 
     parser.add_argument('--output_dir', default='',
@@ -221,7 +221,8 @@ def main(args):
     if args.eval:
         if args.training_output_file != '':
             plot_loss(args.training_output_file)
-        evaluate_toy_setting(model, data_loader_val, criterion, device, args)
+        evaluate_map(model, data_loader_val, device, args)
+        # evaluate_toy_setting(model, data_loader_val, criterion, device, args)
         return
 
     # TRAINING ####################################################################################################

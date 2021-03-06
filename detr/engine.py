@@ -18,6 +18,7 @@ from scipy.signal import savgol_filter
 import numpy as np
 from shapely.geometry import Polygon
 from shapely.errors import TopologicalError
+import pandas as pd
 
 
 def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
@@ -545,6 +546,29 @@ def plot_loss(output_file: str):
 
 
 @torch.no_grad()
+def evaluate_map(model, data_loader_val, device, args):
+    assert args.pretrained_model != '', "Give path to pretrained model with --pretrained_model"
+
+    print("######################")
+    print("EVALUATION")
+
+    if "checkpoint" in args.pretrained_model:
+        state_dict = torch.load(args.pretrained_model)["model"]
+    else:
+        state_dict = torch.load(args.pretrained_model)
+    model.load_state_dict(state_dict)
+    model.eval()
+
+    for samples, targets in data_loader_val:
+        samples = samples.to(device)
+        targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
+
+        outputs = model(samples)
+        outputs = {k: v for k, v in outputs.items() if k != 'aux_outputs'}
+
+        #TODO: continue this
+
+@torch.no_grad()
 def evaluate_toy_setting(model, data_loader_val, criterion, device, args):
     assert args.pretrained_model != '', "Give path to pretrained model with --pretrained_model"
 
@@ -588,8 +612,8 @@ def evaluate_toy_setting(model, data_loader_val, criterion, device, args):
         outputs = model(samples)
         outputs = {k: v for k, v in outputs.items() if k != 'aux_outputs'}
 
-        # plot_prediction(samples, outputs, targets)
-
+        plot_prediction(samples, outputs, targets)
+        exit(0)
         indices = criterion.get_indices(outputs, targets)
 
         for pred_logits, pred_boxes, target, idx, sample in zip(outputs["pred_logits"], outputs["pred_boxes"], targets, indices, samples.tensors):

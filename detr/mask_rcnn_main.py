@@ -9,6 +9,7 @@ from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 from torchvision.models.detection.mask_rcnn import MaskRCNNPredictor
 import math
 import sys
+import baseline
 
 import matplotlib.pyplot as plt
 
@@ -83,21 +84,37 @@ def test_forward():
 
 if __name__ == '__main__':
 
-    seed = 1
-    torch.manual_seed(seed)
-    np.random.seed(seed)
-    random.seed(seed)
-
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     # device = torch.device('cpu')
     print("RUNNING ON", device)
 
     num_classes = 2
 
+    seed = 43
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+
     path = "/tudelft.net/staff-bulk/ewi/insy/VisionLab/yanconglin/dataset/gate_samples"
     pkl_path = "/home/nfs/andreaalfieria/iros_10000.pkl"
     # path = "/home/andreaalf/Documents/thesis/datasets/gate_samples"
     # pkl_path = "/home/andreaalf/Documents/thesis/datasets/normalized_train_8000imgs.pkl"
+
+    #############################################
+    # EVALUATION PARAMETERS
+    # Delete this for no evaluation
+    eval_model = "/home/andreaalf/Documents/thesis/detr/results/baseline_comparison/maskrcnn_uniform8000_100epochs.pth"
+    # eval_model = ""
+    eval_pkl_path = "/home/andreaalf/Documents/thesis/datasets/normalized_test_2000imgs.pkl"
+    if eval_model != "":
+        baseline.evaluate(
+            model=get_instance_segmentation_model(num_classes),
+            pkl_path=eval_pkl_path,
+            pretrained_model=eval_model,
+            ds_func=get_mask_rcnn_dataset
+        )
+        exit(0)
+    #############################################
 
     save_model_to = "/home/nfs/andreaalfieria/thesis/detr/tmp/maskrcnn_iros10000_300epochs_LR1e4.pth"
     # save_model_to = ""

@@ -35,5 +35,5 @@ def build_dataset(image_set, args):
     raise ValueError(f'dataset {args.dataset_file} not supported')
 
 
-def get_mask_rcnn_dataset(path: str, pkl_path: str):
-    return RealGatesDS(dataset_path=path, pkl_path=pkl_path, image_set='train', mask_rcnn=True)
+def get_mask_rcnn_dataset(path: str, pkl_path: str, image_set='train'):
+    return RealGatesDS(dataset_path=path, pkl_path=pkl_path, image_set=image_set, mask_rcnn=True)

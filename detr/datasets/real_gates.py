@@ -113,9 +113,30 @@ class RealGatesDS(torch.utils.data.Dataset):
     std_transforms = T.Compose([
         ToTensor(),
         Resize((256, 256)),
-        AddGaussianNoise(prob=0.05),
-        Hue(prob=0.1)
+        AddGaussianNoise(prob=1.0),
+        Hue(prob=0.0)
     ])
+
+    folder_codes = {
+        "basement_course1": 0,
+        "basement_course3": 1,
+        "bebop_merge": 2,
+        "bebop_merge_distort": 3,
+        "cyberzoo": 4,
+        "daylight15k": 5,
+        "daylight_course1": 6,
+        "daylight_course3": 7,
+            "daylight_course5": 8,
+        "daylight_flight": 9,
+        "eth": 10,
+        "google_merge_distort": 11,
+        "iros2018_course1": 12,
+        "iros2018_course3_test": 13,
+        "iros2018_course5": 14,
+        "iros2018_flights": 15,
+        "iros2018_frontal": 16,
+        "random_flight": 17
+    }
 
     def __init__(self, dataset_path, pkl_path, image_set='train', transform=None, mask_rcnn=False):
         assert isinstance(dataset_path, str)
@@ -152,11 +173,12 @@ class RealGatesDS(torch.utils.data.Dataset):
         row = self.df.iloc[index]
 
         img_path = str(row['img_path'])
+        folder_name = img_path.split('/')[0]
         img = Image.open(join(
             self.dataset_path,
             img_path
         ))
-        img_id = int(img_path.split('/')[1].replace('.jpg', ''))
+        img_id = int(img_path.split('/')[1].replace('.jpg', '')) + (100000*self.folder_codes[folder_name])
 
         height, width = [int(i) for i in row['img_shape']]
         img_size = [height, width]
