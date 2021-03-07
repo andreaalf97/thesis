@@ -593,8 +593,6 @@ def evaluate_map(model, data_loader_val, device, args):
     model.load_state_dict(state_dict)
     model.eval()
 
-    iou_threshold = float(args.iou_treshold)
-
     results = pd.DataFrame({
         'img_id': [],
         'gt_id': [],
@@ -669,7 +667,7 @@ def evaluate_map(model, data_loader_val, device, args):
 
     res_path = join(
         folder_path,
-        "EVAL_" + model_name + ("_IOU" + str(int(iou_threshold*100))) + ".pkl"
+        "EVAL_" + model_name + ".pkl"
     )
     ds_info_path = join(
         folder_path,
@@ -679,6 +677,7 @@ def evaluate_map(model, data_loader_val, device, args):
     print("SAVING RESULTS TO" + res_path)
     results.to_pickle(res_path)
     image_objects.to_pickle(ds_info_path)
+
 
 @torch.no_grad()
 def evaluate_toy_setting(model, data_loader_val, criterion, device, args):

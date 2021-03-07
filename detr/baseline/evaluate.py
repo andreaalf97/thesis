@@ -56,8 +56,6 @@ def evaluate(model, pkl_path, pretrained_model, ds_func, ds_path, save_results_t
     model.load_state_dict(torch.load(pretrained_model))
     model.eval()
 
-    iou_threshold = 0.75
-
     ds = ds_func(
         ds_path,
         pkl_path=pkl_path,

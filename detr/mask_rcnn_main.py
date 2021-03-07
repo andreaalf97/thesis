@@ -105,7 +105,7 @@ if __name__ == '__main__':
     # Comment this out for no evaluation
     eval_model = "/home/nfs/andreaalfieria/thesis/detr/tmp/maskrcnn_uniform8000_100epochs.pth"
     eval_pkl_path = "/home/nfs/andreaalfieria/normalized_test_2000imgs.pkl"
-    save_results_to = "/home/nfs/andreaalfieria/thesis/detr/tmp/EVAL_maskrcnn_uniform8000_100epochs.pkl"
+    save_results_to = "/home/nfs/andreaalfieria/thesis/detr/tmp/EVAL_maskrcnn_uniform8000_100epochs_Gaussian.pkl"
 
     if eval_model != "":
         baseline.evaluate(
