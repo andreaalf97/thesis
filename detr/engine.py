@@ -644,7 +644,7 @@ def evaluate_map(model, data_loader_val, device, args):
                 row['pred_id'].append(int(pred_index))
                 row['confidence'].append(confidence)
                 row['outcome'].append(
-                    'TP' if iou_score > iou_threshold else 'FP'
+                    iou_score
                 )
                 row['gate'].append(pred_boxes[pred_index].tolist())
             for conf, i in false_positives:
@@ -652,7 +652,7 @@ def evaluate_map(model, data_loader_val, device, args):
                 row['gt_id'].append(-1)
                 row['pred_id'].append(i)
                 row['confidence'].append(conf)
-                row['outcome'].append('FP')
+                row['outcome'].append(0.0)
                 row['gate'].append(pred_boxes[i].tolist())
 
             results = results.append(pd.DataFrame(row), ignore_index=True)

@@ -56,7 +56,7 @@ def evaluate(model, pkl_path, pretrained_model, ds_func, ds_path, save_results_t
     model.load_state_dict(torch.load(pretrained_model))
     model.eval()
 
-    iou_threshold = 0.5
+    iou_threshold = 0.75
 
     ds = ds_func(
         ds_path,
@@ -113,7 +113,7 @@ def evaluate(model, pkl_path, pretrained_model, ds_func, ds_path, save_results_t
                 row['pred_id'].append(int(pred_index))
                 row['confidence'].append(output_dict['scores'][pred_index].item())
                 row['outcome'].append(
-                    'TP' if iou_score > iou_threshold else 'FP'
+                    iou_score
                 )
                 row['bbox'].append(output_dict['boxes'][pred_index].tolist())
             for index in false_positives:
@@ -121,7 +121,7 @@ def evaluate(model, pkl_path, pretrained_model, ds_func, ds_path, save_results_t
                 row['gt_id'].append(-1)
                 row['pred_id'].append(index)
                 row['confidence'].append(output_dict['scores'][index].item())
-                row['outcome'].append('FP')
+                row['outcome'].append(0.0)
                 row['bbox'].append(output_dict['boxes'][index].tolist())
 
             results = results.append(pd.DataFrame(row), ignore_index=True)
