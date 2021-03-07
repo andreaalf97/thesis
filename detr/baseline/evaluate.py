@@ -73,7 +73,8 @@ def evaluate(model, pkl_path, pretrained_model, ds_func, ds_path, save_results_t
         'gt_id': [],
         'pred_id': [],
         'confidence': [],
-        'outcome': []
+        'outcome': [],
+        'bbox': []
     })
 
     for iteration, (images, targets) in enumerate(data_loader):
@@ -87,7 +88,10 @@ def evaluate(model, pkl_path, pretrained_model, ds_func, ds_path, save_results_t
             # print('\n')
             # print('\n'.join(str(k) + ' -- ' + str(target[k].shape) for k in target))
 
-            '''Scores is a list of tuples as long as the objects in the ground truth: (gt_index, pred_index, iou_score)'''
+            '''output_dict contains [boxes, labels, scores, masks] as keys'''
+
+            '''Scores is a list of tuples as long as the objects in the ground truth: 
+               (gt_index, pred_index, iou_score)'''
             scores, false_positives = match_masks_optim(
                 gt_masks=target['masks'],
                 pred_masks=torch.where(output_dict['masks'] > 0.5, 1, 0)
@@ -99,7 +103,8 @@ def evaluate(model, pkl_path, pretrained_model, ds_func, ds_path, save_results_t
                 'gt_id': [],
                 'pred_id': [],
                 'confidence': [],
-                'outcome': []
+                'outcome': [],
+                'bbox': []
             }
 
             for gt_index, pred_index, iou_score in scores:
@@ -110,12 +115,14 @@ def evaluate(model, pkl_path, pretrained_model, ds_func, ds_path, save_results_t
                 row['outcome'].append(
                     'TP' if iou_score > iou_threshold else 'FP'
                 )
+                row['bbox'].append(output_dict['boxes'][pred_index].tolist())
             for index in false_positives:
                 row['img_id'].append(img_id)
                 row['gt_id'].append(-1)
                 row['pred_id'].append(index)
                 row['confidence'].append(output_dict['scores'][index].item())
                 row['outcome'].append('FP')
+                row['bbox'].append(output_dict['boxes'][index].tolist())
 
             results = results.append(pd.DataFrame(row), ignore_index=True)
 

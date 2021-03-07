@@ -556,12 +556,12 @@ def match_predictions_optim(pred_logits: torch.Tensor, pred_boxes: torch.Tensor,
         confidence, pred_class = torch.max(torch.softmax(logits, dim=0), 0)
         if pred_class == 0:
             predictions.append((
-                pred_boxes[index], confidence.item()
+                pred_boxes[index], confidence.item(), index
             ))
 
     cost_matrix = [[0 for _ in range(len(predictions))] for _ in range(len(gt_boxes))]
     for i, gt_box in enumerate(gt_boxes):  # For each GT mask we find the best match
-        for j, (pred_box, _) in enumerate(predictions):  # For each prediction mask we compare it
+        for j, (pred_box, _, _) in enumerate(predictions):  # For each prediction mask we compare it
             iou_score = iou(
                 pred_box,
                 gt_box
@@ -572,11 +572,11 @@ def match_predictions_optim(pred_logits: torch.Tensor, pred_boxes: torch.Tensor,
     match = linear_sum_assignment(cost_matrix, maximize=True)
 
     false_positives = []
-    for index, (p, conf) in enumerate(predictions):
+    for index, (p, conf, real_index) in enumerate(predictions):
         if index not in match[1]:  # Prediction not assigned to any GT polygon
-            false_positives.append(conf)
+            false_positives.append((conf, real_index))
 
-    return [[i, j, cost_matrix[i][j], predictions[j][1]] for i, j in zip(match[0], match[1])], false_positives
+    return [[i, predictions[j][2], cost_matrix[i][j], predictions[j][1]] for i, j in zip(match[0], match[1])], false_positives
 
 
 @torch.no_grad()
@@ -600,7 +600,8 @@ def evaluate_map(model, data_loader_val, device, args):
         'gt_id': [],
         'pred_id': [],
         'confidence': [],
-        'outcome': []
+        'outcome': [],
+        'gate': []
     })
     image_objects = pd.DataFrame({
         'img_id': [],
@@ -633,7 +634,8 @@ def evaluate_map(model, data_loader_val, device, args):
                 'gt_id': [],
                 'pred_id': [],
                 'confidence': [],
-                'outcome': []
+                'outcome': [],
+                'gate': []
             }
 
             for gt_index, pred_index, iou_score, confidence in scores:
@@ -644,12 +646,14 @@ def evaluate_map(model, data_loader_val, device, args):
                 row['outcome'].append(
                     'TP' if iou_score > iou_threshold else 'FP'
                 )
-            for i, conf in enumerate(false_positives):
+                row['gate'].append(pred_boxes[pred_index].tolist())
+            for conf, i in false_positives:
                 row['img_id'].append(img_id)
                 row['gt_id'].append(-1)
                 row['pred_id'].append(i)
                 row['confidence'].append(conf)
                 row['outcome'].append('FP')
+                row['gate'].append(pred_boxes[i].tolist())
 
             results = results.append(pd.DataFrame(row), ignore_index=True)
             image_objects = image_objects.append(pd.DataFrame({
