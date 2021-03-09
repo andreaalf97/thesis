@@ -89,7 +89,7 @@ def get_args_parser():
     parser.add_argument('--real_gate_path', type=str,
                         default="/home/andreaalf/Documents/thesis/datasets/gate_samples"
                         )
-    parser.add_argument('--real_gate_pickle_path', type=str, default="/home/andreaalf/Documents/thesis/datasets/normalized_test_2000imgs.pkl")
+    parser.add_argument('--real_gate_pickle_path', type=str, default="/home/andreaalf/Documents/thesis/datasets/random.pkl")
 
 
     parser.add_argument('--output_dir', default='',
@@ -103,10 +103,9 @@ def get_args_parser():
                         help='start epoch')
 
     parser.add_argument('--eval', action='store_true')
-    parser.add_argument('--pretrained_model', default='/home/andreaalf/Documents/thesis/detr/results/baseline_comparison/detr_100epochs_uniform8000.pth')
+    parser.add_argument('--pretrained_model', default='/home/andreaalf/Documents/thesis/detr/results/real_gates/real_gates_300epochs.pth')
     parser.add_argument('--training_output_file', default='')
     parser.add_argument('--num_gates', default='-1')  # -1 for random number between 1 and 5
-    parser.add_argument('--iou_treshold', default='0.50')
     parser.add_argument('--num_workers', default=2, type=int)
 
     # distributed training parameters

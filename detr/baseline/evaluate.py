@@ -7,10 +7,12 @@ import numpy as np
 from scipy.optimize import linear_sum_assignment
 
 
-def show_pred(img, mask):
-    plt.show(img)
-    plt.imshow(mask.squeeze(0), alpha=0.5, cmap='jet', interpolation='none')
+def show_pred(img, masks):
+    plt.imshow(img.cpu().permute(1, 2, 0))
     plt.show()
+    for mask in masks:
+        plt.imshow(mask.cpu().squeeze(0))
+        plt.show()
 
 
 def collate(data):
