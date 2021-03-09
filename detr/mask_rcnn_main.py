@@ -96,14 +96,15 @@ if __name__ == '__main__':
     random.seed(seed)
 
     path = "/tudelft.net/staff-bulk/ewi/insy/VisionLab/yanconglin/dataset/gate_samples"
-    pkl_path = "/home/nfs/andreaalfieria/iros_10000.pkl"
+    pkl_path = "/home/nfs/andreaalfieria/STD_TRAIN_daylight15k_irosFrontal.pkl"
     # path = "/home/andreaalf/Documents/thesis/datasets/gate_samples"
     # pkl_path = "/home/andreaalf/Documents/thesis/datasets/normalized_train_8000imgs.pkl"
 
     #############################################
     # EVALUATION PARAMETERS
     # Comment this out for no evaluation
-    eval_model = "/home/nfs/andreaalfieria/thesis/detr/tmp/maskrcnn_uniform8000_100epochs.pth"
+    # eval_model = "/home/nfs/andreaalfieria/thesis/detr/tmp/maskrcnn_uniform8000_100epochs.pth"
+    eval_model = ""
     # eval_model = "/home/andreaalf/Documents/thesis/detr/results/baseline_comparison/maskrcnn_uniform8000_100epochs.pth"
     eval_pkl_path = "/home/nfs/andreaalfieria/normalized_test_2000imgs.pkl"
     # eval_pkl_path = "/home/andreaalf/Documents/thesis/datasets/normalized_test_2000imgs.pkl"
@@ -122,12 +123,12 @@ if __name__ == '__main__':
         exit(0)
     #############################################
 
-    save_model_to = "/home/nfs/andreaalfieria/thesis/detr/tmp/maskrcnn_iros10000_300epochs_LR1e4.pth"
+    save_model_to = "/home/nfs/andreaalfieria/thesis/detr/tmp/maskrcnn_STD_1epochs_test.pth"
     # save_model_to = ""
-    num_epochs = 300
+    num_epochs = 1
     batch_size = 8
-    # learning_rate = 0.005  DEFAULT
-    learning_rate = 1e-4
+    learning_rate = 0.005
+    # learning_rate = 1e-4
 
     #############################################
     ds = get_mask_rcnn_dataset(
@@ -214,4 +215,4 @@ if __name__ == '__main__':
     print("Average sample loading time: %.4f s/batch" % (sum(load_times)/len(load_times)))
     if save_model_to != "":
         torch.save(model.state_dict(), save_model_to)
-        print("SAVED MODEL")
+        print("SAVED MODEL at", save_model_to)
