@@ -96,6 +96,122 @@ class AddGaussianNoise(object):
             return img, target
 
 
+class RandomHorizontalFlip(object):
+    def __init__(self, prob=0.5):
+        self.prob = prob
+        self.t = T.RandomHorizontalFlip(p=1.0)
+
+    def __call__(self, item: tuple) -> tuple:
+        img, target = item
+        if random.random() < self.prob:
+            img = self.t(img)
+
+            if not target['isrelative']:
+                _, width = target['size']
+                new_masks = []
+                for mask in target['masks']:
+                    new_masks.append(self.t(mask))
+                target['masks'] = torch.stack(new_masks)
+
+                new_gates = []
+                for gate in target['gates']:
+                    new_gates.append([
+                        width - gate[6].item(),
+                        gate[7].item(),
+                        width - gate[4].item(),
+                        gate[5].item(),
+                        width - gate[2].item(),
+                        gate[3].item(),
+                        width - gate[0].item(),
+                        gate[1].item()
+                    ])
+                    target['gates'] = torch.tensor(new_gates, dtype=torch.float32)
+
+                new_boxes = []
+                for bbox in target['boxes']:
+                    new_boxes.append([
+                        width - bbox[2].item(),
+                        bbox[1].item(),
+                        width - bbox[0].item(),
+                        bbox[3].item()
+                    ])
+                target['boxes'] = torch.tensor(new_boxes, dtype=torch.float32)
+            else:
+                new_boxes = []
+                for bbox in target['boxes']:
+                    new_boxes.append([
+                        1.0 - bbox[6].item(),
+                        bbox[7].item(),
+                        1.0 - bbox[4].item(),
+                        bbox[5].item(),
+                        1.0 - bbox[2].item(),
+                        bbox[3].item(),
+                        1.0 - bbox[0].item(),
+                        bbox[1].item()
+                    ])
+                target['boxes'] = torch.tensor(new_boxes, dtype=torch.float32)
+
+        return img, target
+
+
+class RandomVerticalFlip(object):
+    def __init__(self, prob=0.5):
+        self.prob = prob
+        self.t = T.RandomVerticalFlip(p=1.0)
+
+    def __call__(self, item: tuple) -> tuple:
+        img, target = item
+        if random.random() < self.prob:
+            img = self.t(img)
+
+            if not target['isrelative']:
+                height, _ = target['size']
+                new_masks = []
+                for mask in target['masks']:
+                    new_masks.append(self.t(mask))
+                target['masks'] = torch.stack(new_masks)
+
+                new_gates = []
+                for gate in target['gates']:
+                    new_gates.append([
+                        gate[2].item(),
+                        height - gate[3].item(),
+                        gate[0].item(),
+                        height - gate[1].item(),
+                        gate[6].item(),
+                        height - gate[7].item(),
+                        gate[4].item(),
+                        height - gate[5].item()
+                    ])
+                    target['gates'] = torch.tensor(new_gates, dtype=torch.float32)
+
+                new_boxes = []
+                for bbox in target['boxes']:
+                    new_boxes.append([
+                        bbox[0].item(),
+                        height - bbox[3].item(),
+                        bbox[2].item(),
+                        height - bbox[1].item()
+                    ])
+                target['boxes'] = torch.tensor(new_boxes, dtype=torch.float32)
+            else:
+                new_boxes = []
+                for bbox in target['boxes']:
+                    new_boxes.append([
+                        bbox[2].item(),
+                        1.0 - bbox[3].item(),
+                        bbox[0].item(),
+                        1.0 - bbox[1].item(),
+                        bbox[6].item(),
+                        1.0 - bbox[7].item(),
+                        bbox[4].item(),
+                        1.0 - bbox[5].item()
+                    ])
+                target['boxes'] = torch.tensor(new_boxes, dtype=torch.float32)
+
+        return img, target
+
+
 class Hue(object):
     def __init__(self, prob=0.5, hue=0.25):
         self.prob = prob
@@ -108,14 +224,104 @@ class Hue(object):
         return img, target
 
 
+def order_y(points: list):
+    assert len(points) == 2 and isinstance(points[0], tuple)
+
+    y_s = [points[0][1], points[1][1]]
+    y_min_index = y_s.index(min(y_s))
+    if y_min_index == 0:
+        y_max_index = 1
+    else:
+        y_max_index = 0
+    return points[y_min_index], points[y_max_index]
+
+
+def reorder(target):
+    if not target['isrelative']:
+        new_gates = []
+        for gate in target['gates']:
+            x_s = [gate[0].item(), gate[2].item(), gate[4].item(), gate[6].item()]
+            y_s = [gate[1].item(), gate[3].item(), gate[5].item(), gate[7].item()]
+
+            min_x = min(x_s)
+            min_x_index = x_s.index(min(x_s))
+
+            left = [(min_x, y_s[min_x_index])]
+
+            del x_s[min_x_index]
+            del y_s[min_x_index]
+
+            min_x = min(x_s)
+            min_x_index = x_s.index(min(x_s))
+            left.append((min_x, y_s[min_x_index]))
+
+            del x_s[min_x_index]
+            del y_s[min_x_index]
+
+            right = [
+                (x_s[0], y_s[0]),
+                (x_s[1], y_s[1])
+            ]
+
+            tl, bl = order_y(left)
+            tr, br = order_y(right)
+            new_gates.append([
+                bl[0], bl[1],
+                tl[0], tl[1],
+                tr[0], tr[1],
+                br[0], br[1]
+            ])
+        target['gates'] = torch.tensor(new_gates, dtype=torch.float32)
+    else:
+        new_gates = []
+        for gate in target['boxes']:
+            x_s = [gate[0].item(), gate[2].item(), gate[4].item(), gate[6].item()]
+            y_s = [gate[1].item(), gate[3].item(), gate[5].item(), gate[7].item()]
+
+            min_x = min(x_s)
+            min_x_index = x_s.index(min(x_s))
+
+            left = [(min_x, y_s[min_x_index])]
+
+            del x_s[min_x_index]
+            del y_s[min_x_index]
+
+            min_x = min(x_s)
+            min_x_index = x_s.index(min(x_s))
+            left.append((min_x, y_s[min_x_index]))
+
+            del x_s[min_x_index]
+            del y_s[min_x_index]
+
+            right = [
+                (x_s[0], y_s[0]),
+                (x_s[1], y_s[1])
+            ]
+
+            tl, bl = order_y(left)
+            tr, br = order_y(right)
+            new_gates.append([
+                bl[0], bl[1],
+                tl[0], tl[1],
+                tr[0], tr[1],
+                br[0], br[1]
+            ])
+        target['boxes'] = torch.tensor(new_gates, dtype=torch.float32)
+    return target
+
+
 class RealGatesDS(torch.utils.data.Dataset):
 
     std_transforms = T.Compose([
         ToTensor(),
-        Resize((256, 256)),
-        AddGaussianNoise(prob=0.0),
-        Hue(prob=0.0)
+        # Resize((256, 256)),
+        Hue(prob=0.1),
+        RandomHorizontalFlip(prob=0.4),
+        RandomVerticalFlip(prob=0.4),
+        AddGaussianNoise(prob=0.1)
     ])
+
+    val_transform = T.Compose([ToTensor()])
 
     folder_codes = {
         "basement_course1": 0,
@@ -126,7 +332,7 @@ class RealGatesDS(torch.utils.data.Dataset):
         "daylight15k": 5,
         "daylight_course1": 6,
         "daylight_course3": 7,
-            "daylight_course5": 8,
+        "daylight_course5": 8,
         "daylight_flight": 9,
         "eth": 10,
         "google_merge_distort": 11,
@@ -143,12 +349,14 @@ class RealGatesDS(torch.utils.data.Dataset):
         assert isinstance(pkl_path, (str, list))
         assert image_set in ('train', 'val')
 
-        image_set = 'test' if 'val' in image_set else image_set
-
         print("[RG DATASET] Initializing Real Gates dataset")
         self.dataset_path = dataset_path
         self.transform = transform if transform is not None else self.std_transforms
         self.mask_rcnn = mask_rcnn
+
+        if 'val' in image_set:
+            image_set = 'test'
+            self.transform = self.val_transform
 
         if isinstance(pkl_path, str):
             self.df = pd.read_pickle(pkl_path)
@@ -230,6 +438,8 @@ class RealGatesDS(torch.utils.data.Dataset):
                 'isrelative': torch.tensor([True], dtype=torch.bool)
             }
 
+        target = reorder(target)
+
         if self.transform:
             img, target = self.transform((img, target))
 
@@ -245,11 +455,13 @@ if __name__ == '__main__':
 
     ds = RealGatesDS(
         "/home/andreaalf/Documents/thesis/datasets/gate_samples",
-        "/home/andreaalf/Documents/thesis/datasets/basement.pkl",
-        mask_rcnn=True
+        "/home/andreaalf/Documents/thesis/datasets/STD_TRAIN_daylight15k_irosFrontal.pkl",
+        mask_rcnn=False,
+        image_set='val'
     )
 
     index = random.choice(range(len(ds)))
+    # index = 0
     img, target = ds[index]
 
     plt.imshow(img.cpu().permute(1, 2, 0))
@@ -258,7 +470,17 @@ if __name__ == '__main__':
     # gates = target['gates']
     # masks = target['masks']
     for box in bnd_box:
-        plt.scatter([box[0], box[2]], [box[1], box[3]])
+        # plt.scatter([box[0], box[2]], [box[1], box[3]])
         # plt.scatter([box[2]*w, box[4]*w, box[6]*w], [box[3]*h, box[5]*h, box[7]*h])
         # plt.scatter([box[0]*w], [box[1]*h])
+        plt.scatter([box[0]*w], [box[1]*h], label='0')
+        plt.scatter([box[2]*w], [box[3]*h], label='1')
+        plt.scatter([box[4]*w], [box[5]*h], label='2')
+        plt.scatter([box[6]*w], [box[7]*h], label='3')
+
+    plt.legend()
+    plt.title(target['image_id'].item())
     plt.show()
+    # for mask in target['masks']:
+    #     plt.imshow(mask)
+    #     plt.show()
