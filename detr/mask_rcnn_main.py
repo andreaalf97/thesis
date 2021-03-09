@@ -123,11 +123,11 @@ if __name__ == '__main__':
         exit(0)
     #############################################
 
-    save_model_to = "/home/nfs/andreaalfieria/thesis/detr/tmp/maskrcnn_STD_100epochs.pth"
+    save_model_to = "/home/nfs/andreaalfieria/thesis/detr/tmp/maskrcnn_STD_300epochs.pth"
     # save_model_to = ""
-    num_epochs = 100
+    num_epochs = 300
     batch_size = 8
-    drop_lr_after = 80
+    drop_lr_after = 200
     learning_rate = 0.005
     # learning_rate = 1e-4
 
