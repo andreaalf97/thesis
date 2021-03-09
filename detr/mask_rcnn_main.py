@@ -125,9 +125,9 @@ if __name__ == '__main__':
 
     save_model_to = "/home/nfs/andreaalfieria/thesis/detr/tmp/maskrcnn_STD_300epochs.pth"
     # save_model_to = ""
-    num_epochs = 300
+    num_epochs = 200
     batch_size = 8
-    drop_lr_after = 200
+    drop_lr_after = 150
     learning_rate = 0.005
     # learning_rate = 1e-4
 
