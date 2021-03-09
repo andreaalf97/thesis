@@ -123,9 +123,9 @@ if __name__ == '__main__':
         exit(0)
     #############################################
 
-    save_model_to = "/home/nfs/andreaalfieria/thesis/detr/tmp/maskrcnn_STD_1epochs_test.pth"
+    save_model_to = "/home/nfs/andreaalfieria/thesis/detr/tmp/maskrcnn_STD_100epochs.pth"
     # save_model_to = ""
-    num_epochs = 1
+    num_epochs = 100
     batch_size = 8
     learning_rate = 0.005
     # learning_rate = 1e-4
@@ -156,7 +156,7 @@ if __name__ == '__main__':
 
     # The scheduler drops the learning rate by 10 every 80 epochs
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer,
-                                                   step_size=200,
+                                                   step_size=80,
                                                    gamma=0.1)
 
     ex_times = []
