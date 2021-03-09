@@ -221,6 +221,11 @@ if __name__ == '__main__':
         print(f"{end-start}s for this epoch")
         ex_times.append(end-start)
 
+        if save_model_to != "":
+            print(f"Saving backup of epoch {epoch} at {save_model_to.replace('.pth', '_checkpoint.pth')}")
+            torch.save(model.state_dict(), save_model_to.replace('.pth', '_checkpoint.pth'))
+            print("SAVED MODEL at", save_model_to.replace('.pth', '_checkpoint.pth'))
+
     print("FINISHED TRAINING")
     print("Average training time: %.4f s/epoch" % (sum(ex_times)/num_epochs))
     print("Average sample loading time: %.4f s/batch" % (sum(load_times)/len(load_times)))
