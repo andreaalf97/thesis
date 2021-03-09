@@ -127,6 +127,7 @@ if __name__ == '__main__':
     # save_model_to = ""
     num_epochs = 100
     batch_size = 8
+    drop_lr_after = 80
     learning_rate = 0.005
     # learning_rate = 1e-4
 
@@ -156,12 +157,22 @@ if __name__ == '__main__':
 
     # The scheduler drops the learning rate by 10 every 80 epochs
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer,
-                                                   step_size=80,
+                                                   step_size=drop_lr_after,
                                                    gamma=0.1)
 
     ex_times = []
     load_times = []
 
+    print("####################################")
+    print("PARAMS:")
+    print("path", path)
+    print('pkl_path', pkl_path)
+    print("save_model_to", save_model_to)
+    print("num_epochs", num_epochs)
+    print("batch_size", batch_size)
+    print("learning_rate", learning_rate)
+    print("drop_lr_after", drop_lr_after)
+    print("####################################")
     print("Start training...")
     model.train()
     for epoch in range(num_epochs):
