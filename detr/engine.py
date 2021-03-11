@@ -62,9 +62,6 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
         # Image values in range 0.0 : 1.0
 
-        plt.imshow(samples.tensors[0].cpu().permute(1, 2, 0))
-        plt.show()
-        exit(0)
         """
         OUTPUTS is a DICT with keys:
             pred_logits --> Tensor of shape [batch_size, 100, 21]
