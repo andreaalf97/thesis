@@ -233,7 +233,7 @@ class TSDataset(torch.utils.data.Dataset):
 
     std_transform = T.Compose([
         ToTensor(),
-        MaskRCNN(),
+        # MaskRCNN(),
         Clamp()
     ])
 
@@ -281,20 +281,20 @@ class TSDataset(torch.utils.data.Dataset):
 
 if __name__ == '__main__':
 
-    mask_rcnn = True
+    mask_rcnn = False
     h, w = 256, 256
     ds = TSDataset(h, w)
 
     for image, target in ds:
         plt.imshow(image.cpu().permute(1, 2, 0))
 
-        # for i in target['boxes']:
-        #     if mask_rcnn:
-        #         plt.scatter([gate[2], gate[4], gate[6]], [gate[3], gate[5], gate[7]])
-        #         plt.scatter([gate[0]], [gate[1]])
-        #     else:
-        #         plt.scatter([gate[2]*w, gate[4]*w, gate[6]*w], [gate[3]*h, gate[5]*h, gate[7]*h])
-        #         plt.scatter([gate[0]*w], [gate[1]*h])
+        for gate in target['boxes']:
+            if mask_rcnn:
+                plt.scatter([gate[2], gate[4], gate[6]], [gate[3], gate[5], gate[7]])
+                plt.scatter([gate[0]], [gate[1]])
+            else:
+                plt.scatter([gate[2]*w, gate[4]*w, gate[6]*w], [gate[3]*h, gate[5]*h, gate[7]*h])
+                plt.scatter([gate[0]*w], [gate[1]*h])
 
         print('\n'.join([str(k) + ' --> ' + str(target[k]) for k in target]))
 
