@@ -238,12 +238,17 @@ class TSDataset(torch.utils.data.Dataset):
 
     std_transform = T.Compose([
         ToTensor(),
+        Clamp()
+    ])
+
+    mask_transform = T.Compose([
+        ToTensor(),
         MaskRCNN(),
         Clamp()
     ])
 
     def __init__(self, img_height, img_width, num_gates=3, black_and_white=True,
-                 no_gate_chance=0.0, stroke=-1, num_corners=4):
+                 no_gate_chance=0.0, stroke=-1, num_corners=4, mask=False):
         self.img_height = img_height
         self.img_width = img_width
         self.num_gates = num_gates
@@ -251,7 +256,10 @@ class TSDataset(torch.utils.data.Dataset):
         self.no_gate_chance = no_gate_chance
         self.stroke = stroke
         self.num_corners = num_corners
-        self.transform = self.std_transform
+        if mask:
+            self.transform = self.mask_transform
+        else:
+            self.transform = self.std_transform
 
     def __len__(self):
         return 10000

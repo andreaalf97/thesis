@@ -1,4 +1,4 @@
-from datasets import get_mask_rcnn_dataset
+from datasets import get_mask_rcnn_dataset, get_toy_setting_dataset
 
 import time
 import torch
@@ -95,7 +95,8 @@ if __name__ == '__main__':
     np.random.seed(seed)
     random.seed(seed)
 
-    path = "/tudelft.net/staff-bulk/ewi/insy/VisionLab/yanconglin/dataset/gate_samples"
+    # path = "/tudelft.net/staff-bulk/ewi/insy/VisionLab/yanconglin/dataset/gate_samples"
+    path = "toy_setting"
     pkl_path = "/home/nfs/andreaalfieria/STD_TRAIN_daylight15k_irosFrontal.pkl"
     # path = "/home/andreaalf/Documents/thesis/datasets/gate_samples"
     # pkl_path = "/home/andreaalf/Documents/thesis/datasets/normalized_train_8000imgs.pkl"
@@ -123,19 +124,22 @@ if __name__ == '__main__':
         exit(0)
     #############################################
 
-    save_model_to = "/home/nfs/andreaalfieria/thesis/detr/tmp/maskrcnn_STD_200epochs.pth"
+    save_model_to = "/home/nfs/andreaalfieria/thesis/detr/tmp/maskrcnn_TOY_1epochs.pth"
     # save_model_to = ""
-    num_epochs = 200
+    num_epochs = 1
     batch_size = 8
     drop_lr_after = 150
     learning_rate = 0.005
     # learning_rate = 1e-4
 
     #############################################
-    ds = get_mask_rcnn_dataset(
-        path,
-        pkl_path=pkl_path
-    )
+    if path == 'toy_setting':
+        ds = get_toy_setting_dataset()
+    else:
+        ds = get_mask_rcnn_dataset(
+            path,
+            pkl_path=pkl_path
+        )
 
     dataset_size = len(ds)
     epoch_iterations = math.ceil(dataset_size / batch_size)
@@ -188,6 +192,10 @@ if __name__ == '__main__':
 
             images = list(i.to(device) for i in images)
             targets = [{k: v.to(device) for k, v in dictionary.items()} for dictionary in targets]
+
+            plt.imshow(images[0].cpu().permute(1, 2, 0))
+            plt.show()
+            exit(0)
 
             # show_batch(images, targets, show_mask=True)
             # exit(0)
