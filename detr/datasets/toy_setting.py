@@ -1,35 +1,34 @@
 import numpy as np
 import cv2
 import random
-import os
 import torch
 import math
-from torchvision.transforms import ToTensor
+
+from PIL import Image, ImageDraw
+import torchvision.transforms as T
 import matplotlib.pyplot as plt
-from matplotlib.patches import Rectangle
 
 
 class PolyGate:
-    def __init__(self, image_height, image_width, color='none', max_num_corners=8):
+    def __init__(self, image_height, image_width, color='none', num_corners=-1, stroke=-1):
+
         self.image_height, self.image_width = image_height, image_width
 
-        self.max_num_corners = max_num_corners
+        self.num_corners = num_corners
 
         self.c_x = random.randint(int(0.20*image_width), int(image_width - (0.20*image_width)))
         self.c_y = random.randint(int(0.20*image_height), int(image_height - (0.20*image_height)))
 
-        a = [0, 0, image_width, image_width]
-        b = [0, image_height, 0, image_height]
-
-        radius_perc = random.random() * 0.25 + 0.05
+        radius_perc = random.uniform(0.05, 0.50)
         self.radius = image_height * radius_perc
 
-        num_corners = random.randint(3, self.max_num_corners)
+        if num_corners == -1:
+            num_corners = random.randint(3, 8)
 
         self.corners = []
 
-        alpha_zero = (2*math.pi / num_corners)
-        alpha = alpha_zero + (random.random() * math.pi)
+        alpha_zero = (2 * math.pi / num_corners)
+        alpha = random.uniform(math.pi/2, math.pi)
         for _ in range(num_corners):
             x = self.c_x + self.radius * math.cos(alpha)
             y = self.c_y + self.radius * math.sin(alpha)
@@ -39,18 +38,23 @@ class PolyGate:
             self.corners.append((int(x+delta_x), int(y+delta_y)))
             alpha += alpha_zero
 
-        self.stroke = random.randint(1, 3)
+        if stroke == -1:
+            self.stroke = random.randint(1, 3)
+        else:
+            self.stroke = stroke
 
         if 'white' in color.lower():
             self.color = (255, 255, 255)
         elif 'black' in color.lower():
             self.color = (0, 0, 0)
-        else:
+        elif 'none' in color.lower():
             self.color = (
                 int(random.random() * 255),
                 int(random.random() * 255),
                 int(random.random() * 255)
             )
+        else:
+            raise Exception(f"Color {color} not supported")
 
     def get_labels(self) -> list:
         labels = []
@@ -58,10 +62,6 @@ class PolyGate:
         for corner in self.corners:
             labels.append(corner[0]/self.image_width)
             labels.append(corner[1]/self.image_height)
-
-        for _ in range(len(self.corners), self.max_num_corners):
-            labels.append(-1)
-            labels.append(-1)
 
         return labels
 
@@ -72,164 +72,15 @@ class PolyGate:
         return len(self.corners)
 
 
-class Gate:
-    def __init__(self, image_height, image_width, perc_of_image_width=0.80, color='none'):
-        self.image_height = image_height
-        self.image_width = image_width
+def get_ts_image(height, width, num_gates=3, no_gate_chance=0.10, black_and_white=True, stroke=-1, num_corners=-1) -> (np.ndarray, list, list):
 
-        self.width = random.randint(0, int(self.image_width*perc_of_image_width))
-        self.height = random.randint(
-            int(self.width * 0.5),
-            int(self.width * 1.5) if self.width * 1.5 < self.image_height else int(self.image_height)
-        )
-
-        self.stroke = random.randint(1, 3)
-
-        if 'white' in color.lower():
-            self.color = (255, 255, 255)
-        elif 'black' in color.lower():
-            self.color = (0, 0, 0)
-        else:
-            self.color = (
-                int(random.random() * 255),
-                int(random.random() * 255),
-                int(random.random() * 255)
-            )
-
-        self.bottom_left = (
-            random.randint(0, self.image_width - self.width),
-            random.randint(self.height, self.image_height)
-        )
-
-        self.top_left = (
-            int(self.bottom_left[0]),
-            int(self.bottom_left[1] - self.height)
-        )
-
-        self.top_right = (
-            int(self.top_left[0] + self.width),
-            int(self.top_left[1])
-        )
-        self.bottom_right = (
-            int(self.top_right[0]),
-            int(self.top_right[1] + self.height)
-        )
-
-    def get_labels(self) -> list:
-        bl = (float(self.bottom_left[0])/self.image_width, float(self.bottom_left[1])/self.image_height)
-        br = (float(self.bottom_right[0])/self.image_width, float(self.bottom_right[1])/self.image_height)
-        tl = (float(self.top_left[0])/self.image_width, float(self.top_left[1])/self.image_height)
-        tr = (float(self.top_right[0])/self.image_width, float(self.top_right[1])/self.image_height)
-
-        return [
-            bl[0], bl[1],
-            tl[0], tl[1],
-            tr[0], tr[1],
-            br[0], br[1]
-        ]
-
-    def get_area(self) -> float:
-        bottom_width = abs(self.bottom_right[0] - self.bottom_left[0])
-        top_width = abs(self.top_right[0] - self.top_left[0])
-        left_height = abs(self.bottom_left[1] - self.top_left[1])
-        right_height = abs(self.bottom_right[1] - self.top_right[1])
-
-        h = max(right_height, left_height)
-        w = max(bottom_width, top_width)
-
-        return h*w/(self.image_height*self.image_width)
-
-    def get_class(self) -> int:
-        return 0
-
-    def rand_shift(self, image_size_perc=0.40):
-
-        shift_h = random.randint(-int(self.image_width * image_size_perc), int(self.image_width * image_size_perc))
-        shift_v = random.randint(-int(self.image_height * image_size_perc), int(self.image_height * image_size_perc))
-
-        self.bottom_left = (
-            self.bottom_left[0] + shift_h,
-            self.bottom_left[1] + shift_v
-        )
-
-        self.top_left = (
-            self.top_left[0] + shift_h,
-            self.top_left[1] + shift_v
-        )
-
-        self.top_right = (
-            self.top_right[0] + shift_h,
-            self.top_right[1] + shift_v
-        )
-
-        self.bottom_right = (
-            self.bottom_right[0] + shift_h,
-            self.bottom_right[1] + shift_v,
-        )
-
-    def rand_rotate(self, incr_perc=0.30):
-
-        if random.random() > 0.5:
-            increment = self.height * (random.random() * incr_perc)
-            if random.random() > 0.5:
-                increment = -increment
-
-            self.bottom_left = (
-                self.bottom_left[0],
-                int(self.bottom_left[1] - increment/2)
-            )
-
-            self.top_left = (
-                self.top_left[0],
-                int(self.top_left[1] + increment/2)
-            )
-
-            self.top_right = (
-                self.top_right[0],
-                int(self.top_right[1] - increment/2)
-            )
-
-            self.bottom_right = (
-                self.bottom_right[0],
-                int(self.bottom_right[1] + increment/2),
-            )
-        else:
-            increment = self.width * (random.random() * incr_perc)
-            if random.random() > 0.5:
-                increment = -increment
-
-            self.bottom_left = (
-                int(self.bottom_left[0] + increment/2),
-                self.bottom_left[1]
-            )
-
-            self.top_left = (
-                int(self.top_left[0] - increment/2),
-                self.top_left[1]
-            )
-
-            self.top_right = (
-                int(self.top_right[0] + increment/2),
-                self.top_right[1]
-            )
-
-            self.bottom_right = (
-                int(self.bottom_right[0] - increment/2),
-                self.bottom_right[1],
-            )
-
-
-def get_ts_image(height, width, num_gates=3, padding=5, rand_gate_number=False, no_gate_chance=0.10,
-                 rotate_chance=0.5, shift_chance=0.5, black_and_white=True, polygate=False) -> (np.ndarray, list, list):
-    assert padding >= 0 and isinstance(padding, int)
-
-    if rand_gate_number:
+    if num_gates == -1:
         if random.random() < no_gate_chance:
             num_gates = 0
         else:
             num_gates = random.randint(1, num_gates)
 
-    img = get_ts_background(height, width, bgr=True, real_background_prob=0.0, black_white=black_and_white)
+    img = get_ts_background(height, width, bgr=False, black_white=black_and_white)
 
     labels = []
     areas = []
@@ -237,24 +88,14 @@ def get_ts_image(height, width, num_gates=3, padding=5, rand_gate_number=False, 
 
     for _ in range(num_gates):
         if black_and_white:
-            gate = Gate(height, width, perc_of_image_width=0.80, color='white') if not polygate else\
-                PolyGate(height, width, color='white')
+            gate = PolyGate(height, width, color='white', stroke=stroke, num_corners=num_corners)
         else:
-            gate = Gate(height, width, perc_of_image_width=0.80, color='none') if not polygate else\
-                PolyGate(height, width, color='none')
-
-        if not polygate and random.random() < rotate_chance:
-            gate.rand_rotate()
-        if not polygate and random.random() < shift_chance:
-            gate.rand_shift(image_size_perc=0.20)
+            gate = PolyGate(height, width, color='none', stroke=stroke, num_corners=num_corners)
 
         labels.append(gate.get_labels())
         areas.append(gate.get_area())
         classes.append(gate.get_class())
-        if not polygate:
-            img = print_gate(img, gate, mark_top_corners=False)
-        else:
-            img = print_polygate(img, gate)
+        img = print_polygate(img, gate)
 
     return img, labels, areas, classes
 
@@ -283,87 +124,14 @@ def print_polygate(img: np.ndarray, gate: PolyGate) -> np.ndarray:
     return img
 
 
-def print_gate(img: np.ndarray, gate: Gate, mark_top_corners=False) -> np.ndarray:
-
-    img = cv2.line(
-        img,
-        gate.bottom_left,
-        gate.top_left,
-        gate.color,
-        gate.stroke,
-        lineType=cv2.LINE_AA
-    )
-
-    img = cv2.line(
-        img,
-        gate.top_left,
-        gate.top_right,
-        gate.color,
-        gate.stroke,
-        lineType=cv2.LINE_AA
-    )
-
-    img = cv2.line(
-        img,
-        gate.top_right,
-        gate.bottom_right,
-        gate.color,
-        gate.stroke,
-        lineType=cv2.LINE_AA
-    )
-
-    img = cv2.line(
-        img,
-        gate.bottom_right,
-        gate.bottom_left,
-        gate.color,
-        gate.stroke,
-        lineType=cv2.LINE_AA
-    )
-
-    if mark_top_corners:
-        img = cv2.circle(
-            img,
-            gate.top_left,
-            2,
-            (255, 0, 0),
-            -1
-        )
-
-        img = cv2.circle(
-            img,
-            gate.top_right,
-            2,
-            (0, 255, 0),
-            -1
-        )
-
-    return img
-
-
-def get_ts_background(height, width, real_background_prob=0.0, bgr=False, black_white=False) -> np.ndarray:
-
-    coin = random.random()
-    if coin <= real_background_prob:
-        backgrounds = os.listdir("backgrounds")
-        background = "backgrounds/" + random.choice(backgrounds)
-        image = cv2.imread(background)
-        image = cv2.resize(image, dsize=(width, height), interpolation=cv2.INTER_CUBIC)
-        return image
+def get_ts_background(height, width, bgr=False, black_white=False) -> np.ndarray:
 
     if black_white:
         image = np.zeros(
             (height, width, 3),
             dtype=np.uint8
         )
-
-        # if random.random() > 0.5:
-        #     image[:, :] = [0, 0, 0]
-        # else:
-        #     image[:, :] = [255, 255, 255]
-
         image[:, :] = [0, 0, 0]
-
         return image
 
     red = random.randint(0, 255)
@@ -390,25 +158,95 @@ def display_image(image: np.ndarray, labels):
     cv2.destroyAllWindows()
 
 
+class ToTensor(object):
+    def __init__(self):
+        self.t = T.ToTensor()
+
+    def __call__(self, sample):
+        img, target = sample
+        img = self.t(img)
+        return img, target
+
+
+class Clamp(object):
+    def __call__(self, sample):
+        img, target = sample
+        boxes = target['boxes']
+        if 'masks' not in target:
+            target['boxes'] = torch.clamp(boxes, 0.0, 1.0)
+        else:
+            h, w = target['size']
+            gates = []
+            for gate in target['boxes']:
+                gates.append([
+                    torch.clamp(gate[0], 0, w).item(),
+                    torch.clamp(gate[1], 0, h).item(),
+                    torch.clamp(gate[2], 0, w).item(),
+                    torch.clamp(gate[3], 0, h).item(),
+                    torch.clamp(gate[4], 0, w).item(),
+                    torch.clamp(gate[5], 0, h).item(),
+                    torch.clamp(gate[6], 0, w).item(),
+                    torch.clamp(gate[7], 0, h).item()
+                ])
+            target['boxes'] = torch.tensor(gates, dtype=torch.float32)
+        return img, target
+
+
+class MaskRCNN(object):
+    def __call__(self, sample):
+        img, target = sample
+
+        h, w = target['size']
+
+        gates = []
+        for gate in target['boxes']:
+            gates.append([
+                gate[0].item() * w,
+                gate[1].item() * h,
+                gate[2].item() * w,
+                gate[3].item() * h,
+                gate[4].item() * w,
+                gate[5].item() * h,
+                gate[6].item() * w,
+                gate[7].item() * h
+            ])
+
+        target['boxes'] = torch.tensor(gates, dtype=torch.float32)
+
+        masks = []
+        for label in target['boxes']:
+            mask_img = Image.new('L', (w, h), 0)
+            ImageDraw.Draw(mask_img).polygon([
+                (label[0], label[1]),
+                (label[2], label[3]),
+                (label[4], label[5]),
+                (label[6], label[7]),
+            ], outline=1, fill=1)
+            mask_img = torch.tensor(np.array(mask_img), dtype=torch.int8)
+            masks.append(mask_img)
+        target['masks'] = torch.stack(masks)
+
+        return img, target
+
+
 class TSDataset(torch.utils.data.Dataset):
 
-    def __init__(self, img_height, img_width, num_gates=5, padding=5, rand_gate_number=True, black_and_white=True,
-                 no_gate_chance=0.0, rotate_chance=0.5, shift_chance=0.5, bbox=False, transform=ToTensor(), polygate=False):
+    std_transform = T.Compose([
+        ToTensor(),
+        MaskRCNN(),
+        Clamp()
+    ])
+
+    def __init__(self, img_height, img_width, num_gates=3, black_and_white=True,
+                 no_gate_chance=0.0, stroke=-1, num_corners=4):
         self.img_height = img_height
         self.img_width = img_width
         self.num_gates = num_gates
-        self.padding = padding
-        self.rand_gate_number = rand_gate_number
         self.black_and_white = black_and_white
         self.no_gate_chance = no_gate_chance
-        self.rotate_chance = rotate_chance
-        self.shift_chance = shift_chance
-        self.bbox = bbox
-        self.transform = transform
-        self.polygate = polygate
-
-        if polygate:
-            assert not bbox, "bbox and polygate not compatible"
+        self.stroke = stroke
+        self.num_corners = num_corners
+        self.transform = self.std_transform
 
     def __len__(self):
         return 10000
@@ -418,31 +256,11 @@ class TSDataset(torch.utils.data.Dataset):
             self.img_height,
             self.img_width,
             num_gates=self.num_gates,
-            padding=self.padding,
-            rand_gate_number=self.rand_gate_number,
             no_gate_chance=self.no_gate_chance,
-            rotate_chance=self.rotate_chance,
-            shift_chance=self.shift_chance,
             black_and_white=self.black_and_white,
-            polygate=self.polygate
+            stroke=self.stroke,
+            num_corners=self.num_corners
         )
-
-        if self.bbox:
-            new_labels = []
-            for gate in labels:
-                min_x = min(gate[0], gate[2], gate[4], gate[6])
-                min_y = min(gate[1], gate[3], gate[5], gate[7])
-                max_x = max(gate[0], gate[2], gate[4], gate[6])
-                max_y = max(gate[1], gate[3], gate[5], gate[7])
-
-                x_c = (max_x + min_x) / 2
-                y_c = (max_y + min_y) / 2
-                h = (max_y - min_y) + (5/self.img_height)
-                w = (max_x - min_x) + (5/self.img_width)
-
-                new_labels.append([x_c, y_c, h, w])
-
-            labels = new_labels
 
         # boxes, labels, image_id, area, iscrowd, orig_size, size
         target = {
@@ -452,33 +270,38 @@ class TSDataset(torch.utils.data.Dataset):
             'area': torch.tensor(areas, dtype=torch.float32),
             'iscrowd': torch.tensor([0 for _ in range(len(labels))], dtype=torch.int64),
             'orig_size': torch.tensor([self.img_height, self.img_width], dtype=torch.int64),
-            'size': torch.tensor([self.img_height, self.img_width], dtype=torch.int64)
+            'size': torch.tensor([self.img_height, self.img_width], dtype=torch.int64),
         }
 
         if self.transform:
-            image = self.transform(image)
+            image, target = self.transform((image, target))
 
         return image, target
 
 
 if __name__ == '__main__':
-    ds = TSDataset(256, 256, num_gates=5, bbox=True)
 
-    for image, label in ds:
+    mask_rcnn = True
+    h, w = 256, 256
+    ds = TSDataset(h, w)
+
+    for image, target in ds:
         plt.imshow(image.cpu().permute(1, 2, 0))
 
-        ax = plt.gca()
-        img_h, img_w = 256, 256
+        # for i in target['boxes']:
+        #     if mask_rcnn:
+        #         plt.scatter([gate[2], gate[4], gate[6]], [gate[3], gate[5], gate[7]])
+        #         plt.scatter([gate[0]], [gate[1]])
+        #     else:
+        #         plt.scatter([gate[2]*w, gate[4]*w, gate[6]*w], [gate[3]*h, gate[5]*h, gate[7]*h])
+        #         plt.scatter([gate[0]*w], [gate[1]*h])
 
-        for gate in label['boxes']:
-            x_c, y_c, h, w = gate[0].item()*img_w, gate[1].item()*img_h, gate[2].item()*img_h, gate[3].item()*img_w
-            rect = Rectangle(
-                (x_c - (w/2), y_c - (h/2)), w, h,
-                edgecolor='red',
-                facecolor='none',
-                linewidth=1
-            )
-            ax.add_patch(rect)
+        print('\n'.join([str(k) + ' --> ' + str(target[k]) for k in target]))
 
         plt.show()
+
+        if 'masks' in target:
+            for mask in target['masks']:
+                plt.imshow(mask)
+                plt.show()
         break
