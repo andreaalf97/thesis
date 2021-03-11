@@ -225,7 +225,9 @@ def main(args):
         return
 
     if args.resume_from != "":
+        print("LOADING PRETRAINED MODEL FROM", args.resume_from)
         model.load_state_dict(torch.load(args.resume_from))
+        print("Will continue training from pretrained model")
 
     # TRAINING ####################################################################################################
 
