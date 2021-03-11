@@ -194,10 +194,6 @@ if __name__ == '__main__':
             images = list(i.to(device) for i in images)
             targets = [{k: v.to(device) for k, v in dictionary.items()} for dictionary in targets]
 
-            plt.imshow(images[0].cpu().permute(1, 2, 0))
-            plt.show()
-            exit(0)
-
             # show_batch(images, targets, show_mask=True)
             # exit(0)
 

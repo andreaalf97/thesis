@@ -258,8 +258,10 @@ class TSDataset(torch.utils.data.Dataset):
         self.num_corners = num_corners
         if mask:
             self.transform = self.mask_transform
+            self.label = 1
         else:
             self.transform = self.std_transform
+            self.label = 0
 
     def __len__(self):
         return 10000
@@ -278,7 +280,7 @@ class TSDataset(torch.utils.data.Dataset):
         # boxes, labels, image_id, area, iscrowd, orig_size, size
         target = {
             'boxes': torch.tensor(labels, dtype=torch.float32),
-            'labels': torch.tensor(classes, dtype=torch.int64),
+            'labels': torch.tensor([self.label for _ in range(len(labels))], dtype=torch.int64),
             'image_id': torch.tensor([len(labels)], dtype=torch.int64),
             'area': torch.tensor(areas, dtype=torch.float32),
             'iscrowd': torch.tensor([0 for _ in range(len(labels))], dtype=torch.int64),
