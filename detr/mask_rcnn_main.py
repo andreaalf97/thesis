@@ -90,11 +90,6 @@ if __name__ == '__main__':
 
     num_classes = 2
 
-    seed = 43
-    torch.manual_seed(seed)
-    np.random.seed(seed)
-    random.seed(seed)
-
     # path = "/tudelft.net/staff-bulk/ewi/insy/VisionLab/yanconglin/dataset/gate_samples"
     path = "toy_setting"
     pkl_path = "/home/nfs/andreaalfieria/STD_TRAIN_daylight15k_irosFrontal.pkl"
@@ -110,6 +105,12 @@ if __name__ == '__main__':
     eval_pkl_path = "/home/nfs/andreaalfieria/normalized_test_2000imgs.pkl"
     # eval_pkl_path = "/home/andreaalf/Documents/thesis/datasets/normalized_test_2000imgs.pkl"
     save_results_to = "/home/nfs/andreaalfieria/thesis/detr/tmp/EVAL_maskrcnn_uniform8000_100epochs_Gaussian.pkl"
+
+    seed = 43
+    seed = seed * 2 if eval_model != "" else seed
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
 
     if eval_model != "":
         baseline.evaluate(
