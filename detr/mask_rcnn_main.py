@@ -90,8 +90,8 @@ if __name__ == '__main__':
 
     num_classes = 2
 
-    # path = "/tudelft.net/staff-bulk/ewi/insy/VisionLab/yanconglin/dataset/gate_samples"
-    path = "toy_setting"
+    path = "/tudelft.net/staff-bulk/ewi/insy/VisionLab/yanconglin/dataset/gate_samples"
+    # path = "toy_setting"
     pkl_path = "/home/nfs/andreaalfieria/STD_TRAIN_daylight15k_irosFrontal.pkl"
     # path = "/home/andreaalf/Documents/thesis/datasets/gate_samples"
     # pkl_path = "/home/andreaalf/Documents/thesis/datasets/normalized_train_8000imgs.pkl"
@@ -99,12 +99,12 @@ if __name__ == '__main__':
     #############################################
     # EVALUATION PARAMETERS
     # Comment this out for no evaluation
-    # eval_model = "/home/nfs/andreaalfieria/thesis/detr/tmp/maskrcnn_uniform8000_100epochs.pth"
-    eval_model = ""
+    eval_model = "/home/nfs/andreaalfieria/thesis/detr/tmp/maskrcnn_STD_200epochs_checkpoint.pth"
+    # eval_model = ""
     # eval_model = "/home/andreaalf/Documents/thesis/detr/results/baseline_comparison/maskrcnn_uniform8000_100epochs.pth"
-    eval_pkl_path = "/home/nfs/andreaalfieria/normalized_test_2000imgs.pkl"
+    eval_pkl_path = "/home/nfs/andreaalfieria/STD_TEST_basement.pkl"
     # eval_pkl_path = "/home/andreaalf/Documents/thesis/datasets/normalized_test_2000imgs.pkl"
-    save_results_to = "/home/nfs/andreaalfieria/thesis/detr/tmp/EVAL_maskrcnn_uniform8000_100epochs_Gaussian.pkl"
+    save_results_to = "/home/nfs/andreaalfieria/thesis/detr/tmp/EVAL_maskrcnn_STD_200epochs.pkl"
 
     seed = 43
     seed = seed * 2 if eval_model != "" else seed
