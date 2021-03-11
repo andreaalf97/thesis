@@ -87,6 +87,15 @@ def evaluate(model, pkl_path, pretrained_model, ds_func, ds_path, save_results_t
             # print('\n'.join(str(k) + ' -- ' + str(output_dict[k].shape) for k in output_dict))
             # print('\n')
             # print('\n'.join(str(k) + ' -- ' + str(target[k].shape) for k in target))
+            # plt.imshow(img.cpu().permute(1, 2, 0))
+            # plt.show()
+            # for mask, score, box in zip(output_dict['masks'], output_dict['scores'], output_dict['boxes']):
+            #     box = box.cpu()
+            #     if score > 0.9:
+            #         plt.imshow(mask.cpu().squeeze(0))
+            #         plt.scatter([box[0], box[2]], [box[1], box[3]])
+            #         plt.show()
+            # exit(0)
 
             '''output_dict contains [boxes, labels, scores, masks] as keys'''
 

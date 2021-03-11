@@ -667,7 +667,7 @@ def evaluate_map(model, data_loader_val, device, args):
 
     res_path = join(
         folder_path,
-        "EVAL_" + model_name + "_Gaussian" + ".pkl"
+        "EVAL_" + model_name + ".pkl"
     )
     ds_info_path = join(
         folder_path,
