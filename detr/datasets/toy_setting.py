@@ -182,11 +182,7 @@ class Clamp(object):
                     torch.clamp(gate[0], 0, w).item(),
                     torch.clamp(gate[1], 0, h).item(),
                     torch.clamp(gate[2], 0, w).item(),
-                    torch.clamp(gate[3], 0, h).item(),
-                    torch.clamp(gate[4], 0, w).item(),
-                    torch.clamp(gate[5], 0, h).item(),
-                    torch.clamp(gate[6], 0, w).item(),
-                    torch.clamp(gate[7], 0, h).item()
+                    torch.clamp(gate[3], 0, h).item()
                 ])
             target['boxes'] = torch.tensor(gates, dtype=torch.float32)
         return img, target
@@ -197,10 +193,24 @@ class MaskRCNN(object):
         img, target = sample
 
         h, w = target['size']
+        h, w = h.item(), w.item()
+
+        masks = []
+        for label in target['boxes']:
+            mask_img = Image.new('L', (w, h), 0)
+            ImageDraw.Draw(mask_img).polygon([
+                (label[0]*w, label[1]*h),
+                (label[2]*w, label[3]*h),
+                (label[4]*w, label[5]*h),
+                (label[6]*w, label[7]*h),
+            ], outline=1, fill=1)
+            mask_img = torch.tensor(np.array(mask_img), dtype=torch.int8)
+            masks.append(mask_img)
+        target['masks'] = torch.stack(masks)
 
         gates = []
         for gate in target['boxes']:
-            gates.append([
+            abs_gate = [
                 gate[0].item() * w,
                 gate[1].item() * h,
                 gate[2].item() * w,
@@ -209,22 +219,17 @@ class MaskRCNN(object):
                 gate[5].item() * h,
                 gate[6].item() * w,
                 gate[7].item() * h
-            ])
+            ]
+
+            x0 = min([abs_gate[0], abs_gate[2], abs_gate[4], abs_gate[6]])
+            x1 = max([abs_gate[0], abs_gate[2], abs_gate[4], abs_gate[6]])
+
+            y0 = min([abs_gate[1], abs_gate[3], abs_gate[5], abs_gate[7]])
+            y1 = max([abs_gate[1], abs_gate[3], abs_gate[5], abs_gate[7]])
+
+            gates.append([x0, y0, x1, y1])
 
         target['boxes'] = torch.tensor(gates, dtype=torch.float32)
-
-        masks = []
-        for label in target['boxes']:
-            mask_img = Image.new('L', (w, h), 0)
-            ImageDraw.Draw(mask_img).polygon([
-                (label[0], label[1]),
-                (label[2], label[3]),
-                (label[4], label[5]),
-                (label[6], label[7]),
-            ], outline=1, fill=1)
-            mask_img = torch.tensor(np.array(mask_img), dtype=torch.int8)
-            masks.append(mask_img)
-        target['masks'] = torch.stack(masks)
 
         return img, target
 
@@ -233,7 +238,7 @@ class TSDataset(torch.utils.data.Dataset):
 
     std_transform = T.Compose([
         ToTensor(),
-        # MaskRCNN(),
+        MaskRCNN(),
         Clamp()
     ])
 
@@ -281,7 +286,7 @@ class TSDataset(torch.utils.data.Dataset):
 
 if __name__ == '__main__':
 
-    mask_rcnn = False
+    mask_rcnn = True
     h, w = 256, 256
     ds = TSDataset(h, w)
 
@@ -290,8 +295,7 @@ if __name__ == '__main__':
 
         for gate in target['boxes']:
             if mask_rcnn:
-                plt.scatter([gate[2], gate[4], gate[6]], [gate[3], gate[5], gate[7]])
-                plt.scatter([gate[0]], [gate[1]])
+                plt.scatter([gate[0], gate[2]], [gate[1], gate[3]])
             else:
                 plt.scatter([gate[2]*w, gate[4]*w, gate[6]*w], [gate[3]*h, gate[5]*h, gate[7]*h])
                 plt.scatter([gate[0]*w], [gate[1]*h])
