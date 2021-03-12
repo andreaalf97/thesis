@@ -321,7 +321,7 @@ class RealGatesDS(torch.utils.data.Dataset):
         AddGaussianNoise(prob=0.1)
     ])
 
-    val_transform = T.Compose([ToTensor(), Hue(prob=1.0)])
+    val_transform = T.Compose([ToTensor()])
 
     folder_codes = {
         "basement_course1": 0,
