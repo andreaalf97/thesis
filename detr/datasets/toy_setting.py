@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 
 
 class PolyGate:
-    def __init__(self, image_height, image_width, color='none', num_corners=-1, stroke=-1):
+    def __init__(self, image_height, image_width, color='none', num_corners=-1, stroke=-1, clamp=True):
 
         self.image_height, self.image_width = image_height, image_width
 
@@ -19,7 +19,7 @@ class PolyGate:
         self.c_x = random.randint(int(0.20*image_width), int(image_width - (0.20*image_width)))
         self.c_y = random.randint(int(0.20*image_height), int(image_height - (0.20*image_height)))
 
-        radius_perc = random.uniform(0.05, 0.50)
+        radius_perc = random.uniform(0.05, 0.40)
         self.radius = image_height * radius_perc
 
         if num_corners == -1:
@@ -33,9 +33,19 @@ class PolyGate:
             x = self.c_x + self.radius * math.cos(alpha)
             y = self.c_y + self.radius * math.sin(alpha)
             slope = math.tan(alpha) if alpha != math.pi/2 else math.tan(alpha + 0.001)
-            delta_x = random.random() * 0.10 * self.radius - 0.05
+            delta_x = random.uniform(0.0, math.sqrt(self.radius))
             delta_y = slope * delta_x
-            self.corners.append((int(x+delta_x), int(y+delta_y)))
+
+            final_x = int(x+delta_x)
+            final_y = int(y+delta_y)
+            if clamp:
+                final_x = 0 if final_x < 0 else final_x
+                final_x = self.image_width if final_x > self.image_width else final_x
+
+                final_y = 0 if final_y < 0 else final_y
+                final_y = self.image_height if final_y > self.image_height else final_y
+
+            self.corners.append((final_x, final_y))
             alpha += alpha_zero
 
         if stroke == -1:
@@ -72,7 +82,7 @@ class PolyGate:
         return len(self.corners)
 
 
-def get_ts_image(height, width, num_gates=3, no_gate_chance=0.10, black_and_white=True, stroke=-1, num_corners=-1) -> (np.ndarray, list, list):
+def get_ts_image(height, width, num_gates=3, no_gate_chance=0.10, black_and_white=True, stroke=-1, num_corners=-1, clamp=True) -> (np.ndarray, list, list):
 
     if num_gates == -1:
         if random.random() < no_gate_chance:
@@ -88,9 +98,9 @@ def get_ts_image(height, width, num_gates=3, no_gate_chance=0.10, black_and_whit
 
     for _ in range(num_gates):
         if black_and_white:
-            gate = PolyGate(height, width, color='white', stroke=stroke, num_corners=num_corners)
+            gate = PolyGate(height, width, color='white', stroke=stroke, num_corners=num_corners, clamp=clamp)
         else:
-            gate = PolyGate(height, width, color='none', stroke=stroke, num_corners=num_corners)
+            gate = PolyGate(height, width, color='none', stroke=stroke, num_corners=num_corners, clamp=clamp)
 
         labels.append(gate.get_labels())
         areas.append(gate.get_area())
@@ -248,7 +258,7 @@ class TSDataset(torch.utils.data.Dataset):
     ])
 
     def __init__(self, img_height, img_width, num_gates=3, black_and_white=True,
-                 no_gate_chance=0.0, stroke=-1, num_corners=4, mask=False):
+                 no_gate_chance=0.0, stroke=-1, num_corners=4, mask=False, clamp_gates=False):
         self.img_height = img_height
         self.img_width = img_width
         self.num_gates = num_gates
@@ -256,6 +266,7 @@ class TSDataset(torch.utils.data.Dataset):
         self.no_gate_chance = no_gate_chance
         self.stroke = stroke
         self.num_corners = num_corners
+        self.clamp_gates = clamp_gates
         if mask:
             self.transform = self.mask_transform
             self.label = 1
@@ -274,7 +285,8 @@ class TSDataset(torch.utils.data.Dataset):
             no_gate_chance=self.no_gate_chance,
             black_and_white=self.black_and_white,
             stroke=self.stroke,
-            num_corners=self.num_corners
+            num_corners=self.num_corners,
+            clamp=self.clamp_gates
         )
 
         # boxes, labels, image_id, area, iscrowd, orig_size, size
@@ -296,26 +308,13 @@ class TSDataset(torch.utils.data.Dataset):
 
 if __name__ == '__main__':
 
-    mask_rcnn = True
-    h, w = 256, 256
-    ds = TSDataset(h, w)
+    ds = TSDataset(256, 256, num_gates=5, black_and_white=True, no_gate_chance=0.0, stroke=-1, num_corners=4, mask=False, clamp_gates=False)
 
     for image, target in ds:
         plt.imshow(image.cpu().permute(1, 2, 0))
 
-        for gate in target['boxes']:
-            if mask_rcnn:
-                plt.scatter([gate[0], gate[2]], [gate[1], gate[3]])
-            else:
-                plt.scatter([gate[2]*w, gate[4]*w, gate[6]*w], [gate[3]*h, gate[5]*h, gate[7]*h])
-                plt.scatter([gate[0]*w], [gate[1]*h])
-
-        print('\n'.join([str(k) + ' --> ' + str(target[k]) for k in target]))
+        print('\n'.join(str(k) + ' --> ' + str(list(target[k].shape)) for k in target))
 
         plt.show()
 
-        if 'masks' in target:
-            for mask in target['masks']:
-                plt.imshow(mask)
-                plt.show()
         break

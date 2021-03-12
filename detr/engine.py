@@ -613,6 +613,9 @@ def evaluate_map(model, data_loader_val, device, args):
         outputs = model(images)
         outputs = {k: v for k, v in outputs.items() if k != 'aux_outputs'}
 
+        # plot_prediction(images, outputs, targets)
+        # continue
+
         for pred_logits, pred_boxes, target in zip(outputs['pred_logits'], outputs['pred_boxes'], targets):  # For each image in the dataset
 
             # print("pred_logits", pred_logits.shape)
