@@ -169,12 +169,11 @@ class SetCriterion(nn.Module):
         losses = {}
         losses['loss_bbox'] = loss_bbox.sum() / num_boxes
 
-        # loss_giou = 1 - torch.diag(box_ops.generalized_box_iou(
-        #     box_ops.box_cxcywh_to_xyxy(src_boxes),
-        #     box_ops.box_cxcywh_to_xyxy(target_boxes)))
-        # losses['loss_giou'] = loss_giou.sum() / num_boxes
+        loss_giou = 1 - torch.diag(box_ops.generalized_box_iou(
+            keypoints_to_bndbox(src_boxes),
+            keypoints_to_bndbox(target_boxes)))
+        losses['loss_giou'] = loss_giou.sum() / num_boxes
 
-        losses['loss_giou'] = torch.zeros(1).to(torch.device(str(loss_bbox.device)))
         return losses
 
     def loss_masks(self, outputs, targets, indices, num_boxes):
@@ -336,6 +335,23 @@ class MLP(nn.Module):
             x = F.relu(layer(x)) if i < self.num_layers - 1 else layer(x)
         return x
 
+
+def keypoints_to_bndbox(x: torch.Tensor):
+    x1, y1, x2, y2, x3, y3, x4, y4 = x.unbind(-1)
+    x_s = torch.stack([x1, x2, x3, x4])
+    y_s = torch.stack([y1, y2, y3, y4])
+
+    min_x, _ = torch.min(x_s, 0)
+    min_y, _ = torch.min(y_s, 0)
+    max_x, _ = torch.max(x_s, 0)
+    max_y, _ = torch.max(y_s, 0)
+
+    min_x = min_x.reshape(-1, 1)
+    min_y = min_y.reshape(-1, 1)
+    max_x = max_x.reshape(-1, 1)
+    max_y = max_y.reshape(-1, 1)
+
+    return torch.cat([min_x, min_y, max_x, max_y], 1)
 
 def build(args):
     # the `num_classes` naming here is somewhat misleading.

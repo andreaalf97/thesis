@@ -76,7 +76,7 @@ def get_args_parser():
     parser.add_argument('--mask_loss_coef', default=1, type=float)
     parser.add_argument('--dice_loss_coef', default=1, type=float)
     parser.add_argument('--bbox_loss_coef', default=5, type=float)
-    parser.add_argument('--giou_loss_coef', default=0, type=float)  # Default 2
+    parser.add_argument('--giou_loss_coef', default=2, type=float)  # Default 2
     parser.add_argument('--eos_coef', default=0.1, type=float,
                         help="Relative classification weight of the no-object class")
 
@@ -91,7 +91,7 @@ def get_args_parser():
     parser.add_argument('--real_gate_path', type=str,
                         default="/home/andreaalf/Documents/thesis/datasets/gate_samples"
                         )
-    parser.add_argument('--real_gate_pickle_path', type=str, default="/home/andreaalf/Documents/thesis/datasets/STD_TEST_basement.pkl")
+    parser.add_argument('--real_gate_pickle_path', type=str, default="/home/andreaalf/Documents/thesis/datasets/STD_TRAIN_daylight15k_irosFrontal.pkl")
 
 
     parser.add_argument('--output_dir', default='',
