@@ -661,7 +661,7 @@ def evaluate_map(model, data_loader_val, device, args):
             image_objects = image_objects.append(pd.DataFrame({
                 'img_id': [img_id],
                 'num_objects': [len(target['boxes'])],
-                'gates': [target['boxes']]
+                'gates': [target['boxes'].cpu().tolist()]
             }), ignore_index=True)
 
         print(f"Iteration {iteration} of {len(data_loader_val)}")
