@@ -603,7 +603,8 @@ def evaluate_map(model, data_loader_val, device, args):
     })
     image_objects = pd.DataFrame({
         'img_id': [],
-        'num_objects': []
+        'num_objects': [],
+        'gates': []
     })
 
     for iteration, (images, targets) in enumerate(data_loader_val):
@@ -659,7 +660,8 @@ def evaluate_map(model, data_loader_val, device, args):
             results = results.append(pd.DataFrame(row), ignore_index=True)
             image_objects = image_objects.append(pd.DataFrame({
                 'img_id': [img_id],
-                'num_objects': [len(target['boxes'])]
+                'num_objects': [len(target['boxes'])],
+                'gates': [target['boxes']]
             }), ignore_index=True)
 
         print(f"Iteration {iteration} of {len(data_loader_val)}")
