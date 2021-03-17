@@ -240,6 +240,10 @@ def main(args):
             model, criterion, data_loader_train, optimizer, device, epoch,
             args.clip_max_norm)
         lr_scheduler.step()
+        if (epoch + 1) % 50 == 0:
+            print("Saving checkpoint...")
+            torch.save(model.state_dict(), args.save_model_to.replace('.pth', f'_checkpoint{epoch}.pth'))
+            print("SAVED MODEL")
         if args.output_dir:
             checkpoint_paths = [output_dir / 'checkpoint.pth']
             # extra checkpoint before LR drop and every 100 epochs
