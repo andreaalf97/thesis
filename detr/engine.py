@@ -586,9 +586,7 @@ def evaluate_map(model, data_loader_val, device, args):
     print("######################")
     print("EVALUATION")
 
-    if "checkpoint" in args.pretrained_model:
-        state_dict = torch.load(args.pretrained_model)["model"]
-    else:
+    if args.pretrained_model != "":
         state_dict = torch.load(args.pretrained_model)
     model.load_state_dict(state_dict)
     model.eval()
