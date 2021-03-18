@@ -97,7 +97,7 @@ if __name__ == '__main__':
     # pkl_path = "/home/andreaalf/Documents/thesis/datasets/normalized_train_8000imgs.pkl"
 
     # resume_from = ""
-    resume_from = "home/nfs/andreaalfieria/thesis/detr/tmp/maskrcnn_STD_150epochs_checkpoint.pth"
+    resume_from = "/home/nfs/andreaalfieria/thesis/detr/tmp/maskrcnn_STD_150epochs_checkpoint.pth"
 
     #############################################
     # EVALUATION PARAMETERS
