@@ -130,7 +130,7 @@ if __name__ == '__main__':
 
     save_model_to = "/home/nfs/andreaalfieria/thesis/detr/tmp/maskrcnn_STD_300epochs.pth"
     # save_model_to = ""
-    num_epochs = 1
+    num_epochs = 150
     batch_size = 8
     drop_lr_after = 100
     learning_rate = 0.005
@@ -233,10 +233,10 @@ if __name__ == '__main__':
         print(f"{end-start}s for this epoch")
         ex_times.append(end-start)
 
-        if save_model_to != "":
-            print(f"Saving backup of epoch {epoch} at {save_model_to.replace('.pth', '_checkpoint.pth')}")
-            torch.save(model.state_dict(), save_model_to.replace('.pth', '_checkpoint.pth'))
-            print("SAVED MODEL at", save_model_to.replace('.pth', '_checkpoint.pth'))
+        if save_model_to != "" and ((epoch+1) % 25 == 0):
+            print(f"Saving backup of epoch {epoch+150} at {save_model_to.replace('.pth', f'_checkpoint{epoch+150}.pth')}")
+            torch.save(model.state_dict(), save_model_to.replace('.pth', f'_checkpoint{epoch+150}.pth'))
+            print("SAVED MODEL at", save_model_to.replace('.pth', f'_checkpoint{epoch+150}.pth'))
 
     print("FINISHED TRAINING")
     print("Average training time: %.4f s/epoch" % (sum(ex_times)/num_epochs))
