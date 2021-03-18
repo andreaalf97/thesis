@@ -96,17 +96,20 @@ if __name__ == '__main__':
     # path = "/home/andreaalf/Documents/thesis/datasets/gate_samples"
     # pkl_path = "/home/andreaalf/Documents/thesis/datasets/normalized_train_8000imgs.pkl"
 
+    # resume_from = ""
+    resume_from = "home/nfs/andreaalfieria/thesis/detr/tmp/maskrcnn_STD_150epochs_checkpoint.pth"
+
     #############################################
     # EVALUATION PARAMETERS
     # Comment this out for no evaluation
-    eval_model = "/home/nfs/andreaalfieria/thesis/detr/tmp/maskrcnn_STD_200epochs_checkpoint.pth"
-    # eval_model = ""
+    # eval_model = "/home/nfs/andreaalfieria/thesis/detr/tmp/maskrcnn_STD_200epochs_checkpoint.pth"
+    eval_model = ""
     # eval_model = "/home/andreaalf/Documents/thesis/detr/results/baseline_comparison/maskrcnn_uniform8000_100epochs.pth"
     eval_pkl_path = "/home/nfs/andreaalfieria/STD_TEST_basement.pkl"
     # eval_pkl_path = "/home/andreaalf/Documents/thesis/datasets/normalized_test_2000imgs.pkl"
     save_results_to = "/home/nfs/andreaalfieria/thesis/detr/tmp/EVAL_maskrcnn_STD_141epochs.pkl"
 
-    seed = 43
+    seed = 7635  # 43
     seed = seed * 2 if eval_model != "" else seed
     torch.manual_seed(seed)
     np.random.seed(seed)
@@ -125,11 +128,11 @@ if __name__ == '__main__':
         exit(0)
     #############################################
 
-    save_model_to = "/home/nfs/andreaalfieria/thesis/detr/tmp/maskrcnn_TOY_1epochs.pth"
+    save_model_to = "/home/nfs/andreaalfieria/thesis/detr/tmp/maskrcnn_STD_300epochs.pth"
     # save_model_to = ""
     num_epochs = 1
     batch_size = 8
-    drop_lr_after = 150
+    drop_lr_after = 100
     learning_rate = 0.005
     # learning_rate = 1e-4
 
@@ -152,6 +155,9 @@ if __name__ == '__main__':
     #############################################
 
     model = get_instance_segmentation_model(num_classes)
+    if resume_from != "":
+        print("RESUMING FROM", resume_from)
+        model.load_state_dict(torch.load(resume_from))
     model.to(device)
 
     #############################################
@@ -177,6 +183,7 @@ if __name__ == '__main__':
     print("batch_size", batch_size)
     print("learning_rate", learning_rate)
     print("drop_lr_after", drop_lr_after)
+    print("resume_from", resume_from)
     print("####################################")
     print("Start training...")
     model.train()
