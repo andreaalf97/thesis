@@ -102,12 +102,12 @@ if __name__ == '__main__':
     #############################################
     # EVALUATION PARAMETERS
     # Comment this out for no evaluation
-    eval_model = "/home/nfs/andreaalfieria/thesis/detr/tmp/maskrcnn_STD_300epochs_checkpoint249.pth"
+    eval_model = "/home/nfs/andreaalfieria/thesis/detr/tmp/maskrcnn_STD_300epochs.pth"
     # eval_model = ""
     # eval_model = "/home/andreaalf/Documents/thesis/detr/results/baseline_comparison/maskrcnn_uniform8000_100epochs.pth"
     eval_pkl_path = "/home/nfs/andreaalfieria/STD_TEST_basement.pkl"
     # eval_pkl_path = "/home/andreaalf/Documents/thesis/datasets/normalized_test_2000imgs.pkl"
-    save_results_to = "/home/nfs/andreaalfieria/thesis/detr/tmp/EVAL_maskrcnn_STD_250epochs.pkl"
+    save_results_to = "/home/nfs/andreaalfieria/thesis/detr/tmp/EVAL_maskrcnn_STD_300epochs.pkl"
 
     seed = 43
     seed = seed * 2 if eval_model != "" else seed
