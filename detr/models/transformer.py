@@ -55,15 +55,28 @@ class Transformer(nn.Module):
         bs, c, h, w = src.shape
         src = src.flatten(2).permute(2, 0, 1)
         # Now src is [8x8, 2, 256]
-        pos_embed = pos_embed.flatten(2).permute(2, 0, 1)
-        query_embed = query_embed.unsqueeze(1).repeat(1, bs, 1)
+        pos_embed = pos_embed.flatten(2).permute(2, 0, 1)  # Sinusoidal positional embeddings
+        query_embed = query_embed.unsqueeze(1).repeat(1, bs, 1)  # TODO: andreaalf, we might want to remove this (these should be learned embeddings)
         mask = mask.flatten(1)
 
-        tgt = torch.zeros_like(query_embed)
+        # memory is the output of the last ENCODER
         memory = self.encoder(src, src_key_padding_mask=mask, pos=pos_embed)
-        hs = self.decoder(tgt, memory, memory_key_padding_mask=mask,
-                          pos=pos_embed, query_pos=query_embed)
-        return hs.transpose(1, 2), memory.permute(1, 2, 0).view(bs, c, h, w)
+
+        """
+            We need to initialize tgt with the first element of the sequence as START = [-1, ..., -1]
+            tgt has now shape [1, batch_size, dim_model]
+        """
+        tgt = torch.unsqueeze(-torch.ones(bs, c), 0).to(src.device)
+
+        # We use the decoder to generate 20 "objects" in an auto-regressive fashion,
+        # by passing the previous output of the last decoder as input to the next decoder
+        for i in range(20):
+            # We generate the entire sequence from the decoder but only keep the new element
+            hs = self.decoder(tgt, memory, memory_key_padding_mask=mask,
+                              pos=pos_embed, query_pos=query_embed)
+            assert hs.shape[0] == bs and hs.shape[1] == c
+            tgt = torch.cat([tgt, torch.unsqueeze(hs, 0)], 0)
+        return tgt.permute(1, 0, 2), memory.permute(1, 2, 0).view(bs, c, h, w)
 
 
 class TransformerEncoder(nn.Module):
@@ -106,10 +119,17 @@ class TransformerDecoder(nn.Module):
                 memory_key_padding_mask: Optional[Tensor] = None,
                 pos: Optional[Tensor] = None,
                 query_pos: Optional[Tensor] = None):
-        # Initially, tgt is all zeros
+
+        """
+        The decoder take in a sequence of objects and the memory of the encoder and outputs a single new element
+        """
+
+        # Initially, tgt only has the <start> token
         output = tgt
 
-        intermediate = []
+        # We add one object with all zeros which will become the final output of the decoder
+        zero_tensor = torch.zeros_like(output[0, :, :]).unsqueeze(0)
+        output = torch.cat([output, zero_tensor], 0)
 
         for layer in self.layers:
             output = layer(output, memory, tgt_mask=tgt_mask,
@@ -117,19 +137,11 @@ class TransformerDecoder(nn.Module):
                            tgt_key_padding_mask=tgt_key_padding_mask,
                            memory_key_padding_mask=memory_key_padding_mask,
                            pos=pos, query_pos=query_pos)
-            if self.return_intermediate:
-                intermediate.append(self.norm(output))
 
         if self.norm is not None:
             output = self.norm(output)
-            if self.return_intermediate:
-                intermediate.pop()
-                intermediate.append(output)
 
-        if self.return_intermediate:
-            return torch.stack(intermediate)
-
-        return output.unsqueeze(0)
+        return output[-1, :, :]
 
 
 class TransformerEncoderLayer(nn.Module):
@@ -197,7 +209,12 @@ class TransformerDecoderLayer(nn.Module):
     def __init__(self, d_model, nhead, dim_feedforward=2048, dropout=0.1,
                  activation="relu", normalize_before=False):
         super().__init__()
+
+        #  d_model: 256
+        #  nhead: 8
+        #  dropout: 0.1
         self.self_attn = nn.MultiheadAttention(d_model, nhead, dropout=dropout)
+
         self.multihead_attn = nn.MultiheadAttention(d_model, nhead, dropout=dropout)
         # Implementation of Feedforward model
         self.linear1 = nn.Linear(d_model, dim_feedforward)
@@ -232,8 +249,25 @@ class TransformerDecoderLayer(nn.Module):
             query: [10, 2, 256]
             key: [10, 2, 256]
             value: [10, 2, 256]
+
+            tgt_key_padding_mask: None
+            tgt_mask: None
+            query_pos: [10, 2, 256]
         """
+        query_pos = None if query_pos is None else query_pos[:tgt.shape[0], :, :]
         q = k = self.with_pos_embed(tgt, query_pos)
+
+        if tgt_mask is not None:
+            raise Exception(f"tgt_mask is not None. Has shape {tgt_mask.shape}")
+
+        # sequence_lenght = tgt.shape[0]
+        # attention_mask = [[False for _ in range(sequence_lenght)] for _ in range(sequence_lenght)]
+        # for i in range(sequence_lenght):
+        #     for j in range(sequence_lenght):
+        #         if j <= i:
+        #             attention_mask[j][i] = True
+        # attention_mask = torch.tensor(attention_mask, dtype=torch.bool).to(tgt.device)
+
         tgt2 = self.self_attn(q, k, value=tgt, attn_mask=tgt_mask,
                               key_padding_mask=tgt_key_padding_mask)[0]
         tgt = tgt + self.dropout1(tgt2)
@@ -262,6 +296,7 @@ class TransformerDecoderLayer(nn.Module):
                     memory_key_padding_mask: Optional[Tensor] = None,
                     pos: Optional[Tensor] = None,
                     query_pos: Optional[Tensor] = None):
+        raise Exception("This module was not modified to work for sequences")
         tgt2 = self.norm1(tgt)
         q = k = self.with_pos_embed(tgt2, query_pos)
         tgt2 = self.self_attn(q, k, value=tgt2, attn_mask=tgt_mask,
@@ -285,6 +320,7 @@ class TransformerDecoderLayer(nn.Module):
                 memory_key_padding_mask: Optional[Tensor] = None,
                 pos: Optional[Tensor] = None,
                 query_pos: Optional[Tensor] = None):
+        # The standard value for self.normalize_before is FALSE
         if self.normalize_before:
             return self.forward_pre(tgt, memory, tgt_mask, memory_mask,
                                     tgt_key_padding_mask, memory_key_padding_mask, pos, query_pos)

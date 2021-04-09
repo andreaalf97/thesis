@@ -34,8 +34,9 @@ class DETR(nn.Module):
         self.num_queries = num_queries
         self.transformer = transformer
         hidden_dim = transformer.d_model
-        self.class_embed = nn.Linear(hidden_dim, num_classes + 1)
-        self.bbox_embed = MLP(hidden_dim, hidden_dim, 8, 3)
+        self.point_embed = nn.Linear(hidden_dim, 2)
+        # self.class_embed = nn.Linear(hidden_dim, num_classes + 1)
+        # self.bbox_embed = MLP(hidden_dim, hidden_dim, 8, 3)
         self.query_embed = nn.Embedding(num_queries, hidden_dim)
         self.input_proj = nn.Conv2d(backbone.num_channels, hidden_dim, kernel_size=1)
         self.backbone = backbone
@@ -72,14 +73,20 @@ class DETR(nn.Module):
 
         """
         The Transformer returns a tuple:
-            0 is the output of the decoders [6, 2, 10, 256]
+            0 is the output of the decoders [6, 2, 10, 256] 
             1 is the output of the last encoder [2, 256, 8, 8]
         """
-        outputs_class = self.class_embed(hs)
-        outputs_coord = self.bbox_embed(hs).sigmoid()
-        out = {'pred_logits': outputs_class[-1], 'pred_boxes': outputs_coord[-1]}
+        output_point = self.point_embed(hs).sigmoid()
+
+        out = {'pred_boxes': output_point}
+
+        # outputs_class = self.class_embed(hs)
+        # outputs_coord = self.bbox_embed(hs).sigmoid()
+        # out = {'pred_logits': outputs_class[-1], 'pred_boxes': outputs_coord[-1]}
         if self.aux_loss:
-            out['aux_outputs'] = self._set_aux_loss(outputs_class, outputs_coord)
+            # out['aux_outputs'] = self._set_aux_loss(outputs_class, outputs_coord)
+            raise Exception("Sequence Transformers not compatible with aux_loss, use --no_aux")
+
         return out
 
     @torch.jit.unused
@@ -252,6 +259,9 @@ class SetCriterion(nn.Module):
         """
 
         outputs_without_aux = {k: v for k, v in outputs.items() if k != 'aux_outputs'}
+        print(outputs_without_aux)
+        print(targets[0]['boxes'])
+        exit(0)
 
         # Retrieve the matching between the outputs of the last layer and the targets
         indices = self.matcher(outputs_without_aux, targets)

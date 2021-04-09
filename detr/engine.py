@@ -68,8 +68,13 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
             pred_boxes --> Tensor of shape [batch_size, 100, 21]
             aux_outputs --> List of length 5 (repetitions of decoder - 1)
                 Each aux_output[i] is again a DICT with keys ['pred_logits', 'pred_boxes']
+                
+            FOR POLYGONS, outputs is a dict with:
+                pred_boxes --> Tensor of shape [batch_size, 21, 2]
         """
         outputs = model(samples)
+
+        # plot_prediction(samples, outputs, targets)
 
         """
         LOSS_DICT is a dict with keys (all tensors of dim 1 or single items)
@@ -81,6 +86,9 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
             loss_ce_4 loss_bbox_4 loss_giou_4 cardinality_error_4
         """
         loss_dict = criterion(outputs, targets)
+
+        print(targets[0])
+        exit(0)
 
         weight_dict = criterion.weight_dict
         losses = sum(loss_dict[k] * weight_dict[k] for k in loss_dict.keys() if k in weight_dict)
