@@ -10,6 +10,10 @@ import matplotlib.pyplot as plt
 
 
 class PolyGate:
+
+    MIN_CORNERS = 3
+    MAX_CORNERS = 7
+
     def __init__(self, image_height, image_width, color='none', num_corners=-1, stroke=-1, clamp=True):
 
         self.image_height, self.image_width = image_height, image_width
@@ -23,7 +27,7 @@ class PolyGate:
         self.radius = image_height * radius_perc
 
         if num_corners == -1:
-            num_corners = random.randint(3, 8)
+            num_corners = random.randint(self.MIN_CORNERS, self.MAX_CORNERS)
 
         self.corners = []
 
@@ -33,7 +37,7 @@ class PolyGate:
             x = self.c_x + self.radius * math.cos(alpha)
             y = self.c_y + self.radius * math.sin(alpha)
             slope = math.tan(alpha) if alpha != math.pi/2 else math.tan(alpha + 0.001)
-            delta_x = random.uniform(0.0, math.sqrt(self.radius))
+            delta_x = random.uniform(0.0, math.sqrt(self.radius)/2)
             delta_y = slope * delta_x
 
             final_x = int(x+delta_x)
@@ -72,6 +76,10 @@ class PolyGate:
         for corner in self.corners:
             labels.append(corner[0]/self.image_width)
             labels.append(corner[1]/self.image_height)
+
+        if self.num_corners == -1:
+            while len(labels) != 2*self.MAX_CORNERS:
+                labels.append(-1)
 
         return labels
 
@@ -248,13 +256,13 @@ class TSDataset(torch.utils.data.Dataset):
 
     std_transform = T.Compose([
         ToTensor(),
-        Clamp()
+        # Clamp()
     ])
 
     mask_transform = T.Compose([
         ToTensor(),
         MaskRCNN(),
-        Clamp()
+        # Clamp()
     ])
 
     def __init__(self, img_height, img_width, num_gates=3, black_and_white=True,
@@ -308,7 +316,7 @@ class TSDataset(torch.utils.data.Dataset):
 
 if __name__ == '__main__':
 
-    ds = TSDataset(256, 256, num_gates=5, black_and_white=True, no_gate_chance=0.0, stroke=-1, num_corners=4, mask=False, clamp_gates=False)
+    ds = TSDataset(256, 256, num_gates=3, black_and_white=True, no_gate_chance=0.0, stroke=-1, num_corners=-1, mask=False, clamp_gates=True)
 
     for image, target in ds:
         plt.imshow(image.cpu().permute(1, 2, 0))
