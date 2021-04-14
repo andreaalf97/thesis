@@ -44,7 +44,7 @@ class Transformer(nn.Module):
             if p.dim() > 1:
                 nn.init.xavier_uniform_(p)
 
-    def forward(self, src, mask, query_embed, pos_embed):
+    def forward(self, src, mask, query_embed, pos_embed, tgt=None):
         """
         src shape torch.Size([2, 256, 8, 8])
         mask shape torch.Size([2, 8, 8])
@@ -59,7 +59,15 @@ class Transformer(nn.Module):
         query_embed = query_embed.unsqueeze(1).repeat(1, bs, 1)
         mask = mask.flatten(1)
 
-        tgt = torch.zeros_like(query_embed)
+        # tgt = torch.zeros_like(query_embed)
+        if self.training:
+            # During training, we have to pass the full output sentence to the model in order to parallelize training
+            # The sentence has to be pre-computed into a batched tensor, padded with the <end> token
+            assert tgt is not None, "Target sequence is expected to be passed to the model during training"
+            print("TRANSFORMER HAS RECEIVED SENTENCE:")
+            print(tgt)
+            exit(0)
+
         memory = self.encoder(src, src_key_padding_mask=mask, pos=pos_embed)
         hs = self.decoder(tgt, memory, memory_key_padding_mask=mask,
                           pos=pos_embed, query_pos=query_embed)

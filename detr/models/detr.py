@@ -41,7 +41,7 @@ class DETR(nn.Module):
         self.backbone = backbone
         self.aux_loss = aux_loss
 
-    def forward(self, samples: NestedTensor):
+    def forward(self, samples: NestedTensor, tgt=None):
         """ The forward expects a NestedTensor, which consists of:
                - samples.tensor: batched images, of shape [batch_size x 3 x H x W]
                - samples.mask: a binary mask of shape [batch_size x H x W], containing 1 on padded pixels
@@ -68,7 +68,10 @@ class DETR(nn.Module):
 
         src, mask = features[-1].decompose()
         assert mask is not None
-        hs = self.transformer(self.input_proj(src), mask, self.query_embed.weight, pos[-1])[0]
+
+        if self.training:
+            assert tgt is not None, "Target sequence is expected to be passed to the model during training"
+        hs = self.transformer(self.input_proj(src), mask, self.query_embed.weight, pos[-1], tgt=tgt)[0]
 
         """
         The Transformer returns a tuple:

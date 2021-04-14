@@ -9,6 +9,13 @@ import torchvision.transforms as T
 import matplotlib.pyplot as plt
 
 
+CLASSES = {
+    "<start>": 0,
+    "<point>": 1,
+    "<end-of-polygon>": 2,
+    "<end-of-computation>": 3
+}
+
 class PolyGate:
 
     MIN_CORNERS = 3
@@ -206,6 +213,71 @@ class Clamp(object):
         return img, target
 
 
+class GetSentence(object):
+    def __init__(self, num_gates, num_corners):
+        self.num_gates = num_gates
+        self.num_corners = num_corners if num_corners != -1 else PolyGate.MAX_CORNERS
+
+    def __call__(self, sample):
+        img, target = sample
+
+        max_lenght = (self.num_gates * (self.num_corners+1)) + 2
+
+        centers = []
+        for polygon in target['boxes']:
+            index = len(polygon)
+            for i, value in enumerate(polygon):
+                if value == -1:
+                    index = i
+                    break
+            mean_x = polygon[:index:2].mean().item()
+            mean_y = polygon[1:index:2].mean().item()
+            centers.append((mean_x, mean_y))
+        centers = {i: c for i, c in enumerate(centers)}
+
+        sequence = []
+        start_token = torch.zeros(256)
+        start_token[2 + CLASSES['<start>']] = 1
+        sequence.append(start_token)
+
+        while len(centers) > 0:
+            min_center = [2, 2]
+            for index in centers:
+                x, y = centers[index]
+                if y < min_center[1]:
+                    min_center = (x, y)
+                    min_index = index
+                elif y == min_center[1] and x < min_center[0]:
+                    min_center = (x, y)
+                    min_index = index
+
+            polygon = target['boxes'][min_index]
+            for x, y in polygon.view(-1, 2):
+                if x == -1:
+                    break
+                token = torch.zeros(256)
+                token[2 + CLASSES['<point>']] = 1
+                token[0] = x
+                token[1] = y
+                sequence.append(token)
+            end_polygon = torch.zeros(256)
+            end_polygon[2 + CLASSES['<end-of-polygon>']] = 1
+            sequence.append(end_polygon)
+
+            centers.pop(min_index)
+
+        # while len(sequence) < max_lenght:
+        end_computation = torch.zeros(256)
+        end_computation[2 + CLASSES['<end-of-computation>']] = 1
+        sequence.append(end_computation)
+
+        sequence = torch.stack(sequence)
+        print(sequence.shape)
+        print(sequence[:, :6])
+        exit(0)
+        return img, target
+
+
 class MaskRCNN(object):
     def __call__(self, sample):
         img, target = sample
@@ -310,6 +382,8 @@ class TSDataset(torch.utils.data.Dataset):
 
         if self.transform:
             image, target = self.transform((image, target))
+            t = GetSentence(self.num_gates, self.num_corners)
+            image, target = t((image, target))
 
         return image, target
 
