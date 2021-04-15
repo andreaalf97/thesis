@@ -71,7 +71,14 @@ class DETR(nn.Module):
 
         if self.training:
             assert tgt is not None, "Target sequence is expected to be passed to the model during training"
+        else:
+            assert tgt is None, "Target sequence is NOT expected to be passed to the model during testing"
+
         hs = self.transformer(self.input_proj(src), mask, self.query_embed.weight, pos[-1], tgt=tgt)[0]
+
+        print(hs.shape)
+        print(hs)
+        exit(0)
 
         """
         The Transformer returns a tuple:

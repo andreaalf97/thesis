@@ -60,17 +60,10 @@ class Transformer(nn.Module):
         mask = mask.flatten(1)
 
         # tgt = torch.zeros_like(query_embed)
-        if self.training:
-            # During training, we have to pass the full output sentence to the model in order to parallelize training
-            # The sentence has to be pre-computed into a batched tensor, padded with the <end> token
-            assert tgt is not None, "Target sequence is expected to be passed to the model during training"
-            print("TRANSFORMER HAS RECEIVED SENTENCE:")
-            print(tgt)
-            exit(0)
 
         memory = self.encoder(src, src_key_padding_mask=mask, pos=pos_embed)
-        hs = self.decoder(tgt, memory, memory_key_padding_mask=mask,
-                          pos=pos_embed, query_pos=query_embed)
+        hs = self.decoder(tgt.permute(1, 0, 2), memory, memory_key_padding_mask=mask,
+                          pos=pos_embed, query_pos=pos_embed[:tgt.shape[1], :, :])
         return hs.transpose(1, 2), memory.permute(1, 2, 0).view(bs, c, h, w)
 
 
@@ -114,17 +107,17 @@ class TransformerDecoder(nn.Module):
                 memory_key_padding_mask: Optional[Tensor] = None,
                 pos: Optional[Tensor] = None,
                 query_pos: Optional[Tensor] = None):
-        # Initially, tgt is all zeros
+        # Initially, tgt was all zeros in the original architecture
         output = tgt
 
         intermediate = []
 
-        for layer in self.layers:
+        for i, layer in enumerate(self.layers):
             output = layer(output, memory, tgt_mask=tgt_mask,
                            memory_mask=memory_mask,
                            tgt_key_padding_mask=tgt_key_padding_mask,
                            memory_key_padding_mask=memory_key_padding_mask,
-                           pos=pos, query_pos=query_pos)
+                           pos=pos, query_pos=query_pos if i != 0 else None)  # At the fist layer, the positional encodings are not used
             if self.return_intermediate:
                 intermediate.append(self.norm(output))
 
@@ -137,7 +130,7 @@ class TransformerDecoder(nn.Module):
         if self.return_intermediate:
             return torch.stack(intermediate)
 
-        return output.unsqueeze(0)
+        return output.unsqueeze(0) if self.return_intermediate else output
 
 
 class TransformerEncoderLayer(nn.Module):
@@ -222,6 +215,14 @@ class TransformerDecoderLayer(nn.Module):
         self.activation = _get_activation_fn(activation)
         self.normalize_before = normalize_before
 
+        attn_mask = torch.ones((100, 100), dtype=torch.bool)
+        for out in range(attn_mask.shape[0]):
+            for inp in range(attn_mask.shape[1]):
+                if inp <= out:
+                    attn_mask[out][inp] = False
+        # self.attn_mask = nn.Parameter(attn_mask, requires_grad=False)
+        self.attn_mask = attn_mask
+
     def with_pos_embed(self, tensor, pos: Optional[Tensor]):
         return tensor if pos is None else tensor + pos
 
@@ -242,7 +243,7 @@ class TransformerDecoderLayer(nn.Module):
             value: [10, 2, 256]
         """
         q = k = self.with_pos_embed(tgt, query_pos)
-        tgt2 = self.self_attn(q, k, value=tgt, attn_mask=tgt_mask,
+        tgt2 = self.self_attn(q, k, value=tgt, attn_mask=self.attn_mask[:tgt.shape[0], :tgt.shape[0]].to(tgt.device),
                               key_padding_mask=tgt_key_padding_mask)[0]
         tgt = tgt + self.dropout1(tgt2)
         tgt = self.norm1(tgt)
@@ -313,7 +314,7 @@ def build_transformer(args):
         num_encoder_layers=args.enc_layers,
         num_decoder_layers=args.dec_layers,
         normalize_before=args.pre_norm,
-        return_intermediate_dec=True,
+        return_intermediate_dec=False,
     )
 
 

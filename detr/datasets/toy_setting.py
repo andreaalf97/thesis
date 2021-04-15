@@ -266,15 +266,14 @@ class GetSentence(object):
 
             centers.pop(min_index)
 
-        # while len(sequence) < max_lenght:
-        end_computation = torch.zeros(256)
-        end_computation[2 + CLASSES['<end-of-computation>']] = 1
-        sequence.append(end_computation)
+        while len(sequence) < max_lenght:
+            end_computation = torch.zeros(256)
+            end_computation[2 + CLASSES['<end-of-computation>']] = 1
+            sequence.append(end_computation)
 
         sequence = torch.stack(sequence)
-        print(sequence.shape)
-        print(sequence[:, :6])
-        exit(0)
+
+        target['sequence'] = sequence
         return img, target
 
 
@@ -395,8 +394,29 @@ if __name__ == '__main__':
     for image, target in ds:
         plt.imshow(image.cpu().permute(1, 2, 0))
 
+        sequence = target['sequence']
+        i = 0
+        while sequence[i][2 + CLASSES['<point>']] != 1:
+            i += 1
+
+        polygon = []
+        while sequence[i][2 + CLASSES['<end-of-computation>']] != 1:
+            if sequence[i][2 + CLASSES['<point>']] != 1:
+                for index, (x, y) in enumerate(polygon):
+                    plt.scatter(
+                        [x*256], [y*256], label=str(index)
+                    )
+                # plt.scatter([x*256 for x, y in polygon], [y*256 for x, y in polygon])
+                # polygon = []
+                break
+            else:
+                polygon.append((sequence[i][0], sequence[i][1]))
+
+            i += 1
+
         print('\n'.join(str(k) + ' --> ' + str(list(target[k].shape)) for k in target))
 
+        plt.legend()
         plt.show()
 
         break

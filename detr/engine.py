@@ -62,9 +62,6 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
         # Image values in range 0.0 : 1.0
 
-        print(targets[0]['boxes'])
-        exit(0)
-
         """
         OUTPUTS is a DICT with keys:
             pred_logits --> Tensor of shape [batch_size, 100, 21]
@@ -72,7 +69,10 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
             aux_outputs --> List of length 5 (repetitions of decoder - 1)
                 Each aux_output[i] is again a DICT with keys ['pred_logits', 'pred_boxes']
         """
-        outputs = model(samples)
+        outputs = model(
+            samples,
+            tgt=torch.stack([target['sequence'] for target in targets])
+        )
 
         """
         LOSS_DICT is a dict with keys (all tensors of dim 1 or single items)
