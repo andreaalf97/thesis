@@ -130,7 +130,7 @@ class TransformerDecoder(nn.Module):
         if self.return_intermediate:
             return torch.stack(intermediate)
 
-        return output.unsqueeze(0) if self.return_intermediate else output
+        return output.unsqueeze(0)
 
 
 class TransformerEncoderLayer(nn.Module):

@@ -34,8 +34,8 @@ class DETR(nn.Module):
         self.num_queries = num_queries
         self.transformer = transformer
         hidden_dim = transformer.d_model
-        self.class_embed = nn.Linear(hidden_dim, num_classes + 1)
-        self.bbox_embed = MLP(hidden_dim, hidden_dim, 8, 3)
+        self.class_embed = nn.Linear(hidden_dim, num_classes)
+        self.bbox_embed = MLP(hidden_dim, hidden_dim, 2, 3)
         self.query_embed = nn.Embedding(num_queries, hidden_dim)
         self.input_proj = nn.Conv2d(backbone.num_channels, hidden_dim, kernel_size=1)
         self.backbone = backbone
@@ -76,10 +76,6 @@ class DETR(nn.Module):
 
         hs = self.transformer(self.input_proj(src), mask, self.query_embed.weight, pos[-1], tgt=tgt)[0]
 
-        print(hs.shape)
-        print(hs)
-        exit(0)
-
         """
         The Transformer returns a tuple:
             0 is the output of the decoders [6, 2, 10, 256]
@@ -88,8 +84,8 @@ class DETR(nn.Module):
         outputs_class = self.class_embed(hs)
         outputs_coord = self.bbox_embed(hs).sigmoid()
         out = {'pred_logits': outputs_class[-1], 'pred_boxes': outputs_coord[-1]}
-        if self.aux_loss:
-            out['aux_outputs'] = self._set_aux_loss(outputs_class, outputs_coord)
+        # if self.aux_loss:
+        #     out['aux_outputs'] = self._set_aux_loss(outputs_class, outputs_coord)
         return out
 
     @torch.jit.unused
@@ -263,6 +259,19 @@ class SetCriterion(nn.Module):
 
         outputs_without_aux = {k: v for k, v in outputs.items() if k != 'aux_outputs'}
 
+        tgt_logits = torch.argmax(torch.stack([target['sequence'][:, 2:6] for target in targets]), dim=2)
+        tgt_boxes = torch.stack([target['sequence'][:, :2] for target in targets])
+
+        condition = torch.where(tgt_logits != 1, True, False).unsqueeze(-1).expand(-1, -1, 2)
+        outputs_without_aux['pred_boxes'] = torch.where(condition, tgt_boxes, outputs_without_aux['pred_boxes'])
+
+        loss_dict = {
+            'loss_ce': F.cross_entropy(outputs_without_aux['pred_logits'].permute(0, 2, 1), tgt_logits),
+            'loss_bbox': F.l1_loss(outputs_without_aux['pred_boxes'], tgt_boxes)
+        }
+
+        return loss_dict
+
         # Retrieve the matching between the outputs of the last layer and the targets
         indices = self.matcher(outputs_without_aux, targets)
 
@@ -378,7 +387,7 @@ def build(args):
         # max_obj_id + 1, but the exact value doesn't really matter
         num_classes = 250
     if args.dataset_file == "toy_setting" or args.dataset_file == "real_gates":
-        num_classes = 1
+        num_classes = 4
     device = torch.device(args.device)
 
     backbone = build_backbone(args)
