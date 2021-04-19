@@ -74,6 +74,19 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
             tgt=torch.stack([target['sequence'] for target in targets])
         )
 
+        # if index % 10 == 0:
+        #     classes = torch.Tensor.float(torch.argmax(outputs['pred_logits'], dim=2))
+        #     start = torch.where(classes == 0, 1, 0)
+        #     point = torch.where(classes == 1, 1, 0)
+        #     end_poly = torch.where(classes == 2, 1, 0)
+        #     end = torch.where(classes == 3, 1, 0)
+        #
+        #     plt.bar(
+        #         ['<start>', '<point>', '<end_poly>', '<end>'],
+        #         [start.sum().item(), point.sum().item(), end_poly.sum().item(), end.sum().item()]
+        #     )
+        #     plt.show()
+
         """
         LOSS_DICT is a dict with keys (all tensors of dim 1 or single items)
             loss_ce class_error loss_bbox loss_giou cardinality_error

@@ -268,7 +268,12 @@ class SetCriterion(nn.Module):
         outputs_without_aux = {k: v for k, v in outputs.items() if k != 'aux_outputs'}
 
         tgt_logits = torch.argmax(torch.stack([target['sequence'][:, 2:6] for target in targets]), dim=2)
+        last_dim = tgt_logits[:, -1]
+        tgt_logits = torch.cat([tgt_logits[:, 1:], last_dim.unsqueeze(-1)], dim=1)
+
         tgt_boxes = torch.stack([target['sequence'][:, :2] for target in targets])
+        last_dim = tgt_boxes[:, -1, :]
+        tgt_boxes = torch.cat([tgt_boxes[:, 1:, :], last_dim.unsqueeze(1)], dim=1)
 
         condition = torch.where(tgt_logits != 1, True, False).unsqueeze(-1).expand(-1, -1, 2)
         outputs_without_aux['pred_boxes'] = torch.where(condition, tgt_boxes, outputs_without_aux['pred_boxes'])
