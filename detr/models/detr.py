@@ -16,6 +16,7 @@ from .matcher import build_matcher
 from .segmentation import (DETRsegm, PostProcessPanoptic, PostProcessSegm,
                            dice_loss, sigmoid_focal_loss)
 from .transformer import build_transformer
+from .rnn import MyRNN
 
 
 class DETR(nn.Module):
@@ -35,7 +36,8 @@ class DETR(nn.Module):
         self.transformer = transformer
         hidden_dim = transformer.d_model
         self.class_embed = nn.Linear(hidden_dim, num_classes + 1)
-        self.bbox_embed = MLP(hidden_dim, hidden_dim, 8, 3)
+        self.bbox_embed = MyRNN(input_size=256, hidden_size=256, num_layers=8, nonlinearity='relu', bias=True)
+        # self.bbox_embed = MLP(hidden_dim, hidden_dim, 8, 3)
         self.query_embed = nn.Embedding(num_queries, hidden_dim)
         self.input_proj = nn.Conv2d(backbone.num_channels, hidden_dim, kernel_size=1)
         self.backbone = backbone
@@ -75,8 +77,12 @@ class DETR(nn.Module):
             0 is the output of the decoders [6, 2, 10, 256]
             1 is the output of the last encoder [2, 256, 8, 8]
         """
+
         outputs_class = self.class_embed(hs)
         outputs_coord = self.bbox_embed(hs).sigmoid()
+
+        exit(0)
+
         out = {'pred_logits': outputs_class[-1], 'pred_boxes': outputs_coord[-1]}
         if self.aux_loss:
             out['aux_outputs'] = self._set_aux_loss(outputs_class, outputs_coord)
