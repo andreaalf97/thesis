@@ -391,32 +391,57 @@ if __name__ == '__main__':
 
     ds = TSDataset(256, 256, num_gates=3, black_and_white=True, no_gate_chance=0.0, stroke=-1, num_corners=-1, mask=False, clamp_gates=True)
 
-    for image, target in ds:
-        plt.imshow(image.cpu().permute(1, 2, 0))
+    start = 0
+    point = 0
+    end_poly = 0
+    end = 0
+
+    tot = 0
+
+    for index, (image, target) in enumerate(ds):
+        # plt.imshow(image.cpu().permute(1, 2, 0))
+
+        if index > 1000:
+            break
+        if index % 10 == 0:
+            print(index)
 
         sequence = target['sequence']
-        i = 0
-        while sequence[i][2 + CLASSES['<point>']] != 1:
-            i += 1
+        classes = torch.argmax(sequence[:, 2:6], dim=1)
 
-        polygon = []
-        while sequence[i][2 + CLASSES['<end-of-computation>']] != 1:
-            if sequence[i][2 + CLASSES['<point>']] != 1:
-                for index, (x, y) in enumerate(polygon):
-                    plt.scatter(
-                        [x*256], [y*256], label=str(index)
-                    )
-                # plt.scatter([x*256 for x, y in polygon], [y*256 for x, y in polygon])
-                # polygon = []
-                break
-            else:
-                polygon.append((sequence[i][0], sequence[i][1]))
+        start += torch.where(classes == 0, 1, 0).sum().item()
+        point += torch.where(classes == 1, 1, 0).sum().item()
+        end_poly += torch.where(classes == 2, 1, 0).sum().item()
+        end += torch.where(classes == 3, 1, 0).sum().item()
+        tot += 26
+        continue
+    print("START:", float(start)/tot)
+    print("POINT:", float(point)/tot)
+    print("END_POLY:", float(end_poly)/tot)
+    print("END:", float(end)/tot)
 
-            i += 1
-
-        print('\n'.join(str(k) + ' --> ' + str(list(target[k].shape)) for k in target))
-
-        plt.legend()
-        plt.show()
-
-        break
+        # i = 0
+        # while sequence[i][2 + CLASSES['<point>']] != 1:
+        #     i += 1
+        #
+        # polygon = []
+        # while sequence[i][2 + CLASSES['<end-of-computation>']] != 1:
+        #     if sequence[i][2 + CLASSES['<point>']] != 1:
+        #         for index, (x, y) in enumerate(polygon):
+        #             plt.scatter(
+        #                 [x*256], [y*256], label=str(index)
+        #             )
+        #         # plt.scatter([x*256 for x, y in polygon], [y*256 for x, y in polygon])
+        #         # polygon = []
+        #         break
+        #     else:
+        #         polygon.append((sequence[i][0], sequence[i][1]))
+        #
+        #     i += 1
+        #
+        # print('\n'.join(str(k) + ' --> ' + str(list(target[k].shape)) for k in target))
+        #
+        # plt.legend()
+        # plt.show()
+        #
+        # break

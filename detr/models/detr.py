@@ -257,6 +257,14 @@ class SetCriterion(nn.Module):
                         This is Height, Width
         """
 
+        #TODO: andreaalf should also consider applying class imbalance
+        """
+            START: 3.84615 %
+            POINT: 57.9689 %
+            END_POLY: 11.5384 %
+            END: 26.6464 %
+        """
+
         outputs_without_aux = {k: v for k, v in outputs.items() if k != 'aux_outputs'}
 
         tgt_logits = torch.argmax(torch.stack([target['sequence'][:, 2:6] for target in targets]), dim=2)
@@ -266,8 +274,8 @@ class SetCriterion(nn.Module):
         outputs_without_aux['pred_boxes'] = torch.where(condition, tgt_boxes, outputs_without_aux['pred_boxes'])
 
         loss_dict = {
-            'loss_ce': F.cross_entropy(outputs_without_aux['pred_logits'].permute(0, 2, 1), tgt_logits),
-            'loss_bbox': F.l1_loss(outputs_without_aux['pred_boxes'], tgt_boxes)
+            'loss_ce': F.cross_entropy(outputs_without_aux['pred_logits'].permute(0, 2, 1), tgt_logits, reduction='sum'),
+            'loss_bbox': F.l1_loss(outputs_without_aux['pred_boxes'], tgt_boxes, reduction='sum')
         }
 
         return loss_dict
