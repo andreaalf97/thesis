@@ -64,8 +64,8 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
 
         """
         OUTPUTS is a DICT with keys:
-            pred_logits --> Tensor of shape [batch_size, 100, 21]
-            pred_boxes --> Tensor of shape [batch_size, 100, 21]
+            pred_logits --> Tensor of shape [batch_size, 10, 2]
+            pred_boxes --> Tensor of shape [batch_size, 10, 8, 3]
             aux_outputs --> List of length 5 (repetitions of decoder - 1)
                 Each aux_output[i] is again a DICT with keys ['pred_logits', 'pred_boxes']
         """

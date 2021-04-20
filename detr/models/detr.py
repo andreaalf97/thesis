@@ -79,9 +79,7 @@ class DETR(nn.Module):
         """
 
         outputs_class = self.class_embed(hs)
-        outputs_coord = self.bbox_embed(hs).sigmoid()
-
-        exit(0)
+        outputs_coord = self.bbox_embed(hs).sigmoid()  # [6, 2, 10, 8, 3]
 
         out = {'pred_logits': outputs_class[-1], 'pred_boxes': outputs_coord[-1]}
         if self.aux_loss:
