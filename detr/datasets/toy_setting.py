@@ -9,7 +9,18 @@ import torchvision.transforms as T
 import matplotlib.pyplot as plt
 
 
+CLASSES = {
+    "<start>": 0,
+    "<point>": 1,
+    "<end-of-polygon>": 2,
+    "<end-of-computation>": 3
+}
+
 class PolyGate:
+
+    MIN_CORNERS = 3
+    MAX_CORNERS = 7
+
     def __init__(self, image_height, image_width, color='none', num_corners=-1, stroke=-1, clamp=True):
 
         self.image_height, self.image_width = image_height, image_width
@@ -23,7 +34,7 @@ class PolyGate:
         self.radius = image_height * radius_perc
 
         if num_corners == -1:
-            num_corners = random.randint(3, 8)
+            num_corners = random.randint(self.MIN_CORNERS, self.MAX_CORNERS)
 
         self.corners = []
 
@@ -33,7 +44,7 @@ class PolyGate:
             x = self.c_x + self.radius * math.cos(alpha)
             y = self.c_y + self.radius * math.sin(alpha)
             slope = math.tan(alpha) if alpha != math.pi/2 else math.tan(alpha + 0.001)
-            delta_x = random.uniform(0.0, math.sqrt(self.radius))
+            delta_x = random.uniform(0.0, math.sqrt(self.radius)/2)
             delta_y = slope * delta_x
 
             final_x = int(x+delta_x)
@@ -72,6 +83,10 @@ class PolyGate:
         for corner in self.corners:
             labels.append(corner[0]/self.image_width)
             labels.append(corner[1]/self.image_height)
+
+        if self.num_corners == -1:
+            while len(labels) != 2*self.MAX_CORNERS:
+                labels.append(-1)
 
         return labels
 
@@ -198,6 +213,70 @@ class Clamp(object):
         return img, target
 
 
+class GetSentence(object):
+    def __init__(self, num_gates, num_corners):
+        self.num_gates = num_gates
+        self.num_corners = num_corners if num_corners != -1 else PolyGate.MAX_CORNERS
+
+    def __call__(self, sample):
+        img, target = sample
+
+        max_lenght = (self.num_gates * (self.num_corners+1)) + 2
+
+        centers = []
+        for polygon in target['boxes']:
+            index = len(polygon)
+            for i, value in enumerate(polygon):
+                if value == -1:
+                    index = i
+                    break
+            mean_x = polygon[:index:2].mean().item()
+            mean_y = polygon[1:index:2].mean().item()
+            centers.append((mean_x, mean_y))
+        centers = {i: c for i, c in enumerate(centers)}
+
+        sequence = []
+        start_token = torch.zeros(256)
+        start_token[2 + CLASSES['<start>']] = 1
+        sequence.append(start_token)
+
+        while len(centers) > 0:
+            min_center = [2, 2]
+            for index in centers:
+                x, y = centers[index]
+                if y < min_center[1]:
+                    min_center = (x, y)
+                    min_index = index
+                elif y == min_center[1] and x < min_center[0]:
+                    min_center = (x, y)
+                    min_index = index
+
+            polygon = target['boxes'][min_index]
+            for x, y in polygon.view(-1, 2):
+                if x == -1:
+                    break
+                token = torch.zeros(256)
+                token[2 + CLASSES['<point>']] = 1
+                token[0] = x
+                token[1] = y
+                sequence.append(token)
+            end_polygon = torch.zeros(256)
+            end_polygon[2 + CLASSES['<end-of-polygon>']] = 1
+            sequence.append(end_polygon)
+
+            centers.pop(min_index)
+
+        while len(sequence) < max_lenght:
+            end_computation = torch.zeros(256)
+            end_computation[2 + CLASSES['<end-of-computation>']] = 1
+            sequence.append(end_computation)
+
+        sequence = torch.stack(sequence)
+
+        target['sequence'] = sequence
+        return img, target
+
+
 class MaskRCNN(object):
     def __call__(self, sample):
         img, target = sample
@@ -248,13 +327,13 @@ class TSDataset(torch.utils.data.Dataset):
 
     std_transform = T.Compose([
         ToTensor(),
-        Clamp()
+        # Clamp()
     ])
 
     mask_transform = T.Compose([
         ToTensor(),
         MaskRCNN(),
-        Clamp()
+        # Clamp()
     ])
 
     def __init__(self, img_height, img_width, num_gates=3, black_and_white=True,
@@ -302,19 +381,42 @@ class TSDataset(torch.utils.data.Dataset):
 
         if self.transform:
             image, target = self.transform((image, target))
+            t = GetSentence(self.num_gates, self.num_corners)
+            image, target = t((image, target))
 
         return image, target
 
 
 if __name__ == '__main__':
 
-    ds = TSDataset(256, 256, num_gates=5, black_and_white=True, no_gate_chance=0.0, stroke=-1, num_corners=4, mask=False, clamp_gates=False)
+    ds = TSDataset(256, 256, num_gates=3, black_and_white=True, no_gate_chance=0.0, stroke=-1, num_corners=-1, mask=False, clamp_gates=True)
 
     for image, target in ds:
         plt.imshow(image.cpu().permute(1, 2, 0))
 
+        sequence = target['sequence']
+        i = 0
+        while sequence[i][2 + CLASSES['<point>']] != 1:
+            i += 1
+
+        polygon = []
+        while sequence[i][2 + CLASSES['<end-of-computation>']] != 1:
+            if sequence[i][2 + CLASSES['<point>']] != 1:
+                for index, (x, y) in enumerate(polygon):
+                    plt.scatter(
+                        [x*256], [y*256], label=str(index)
+                    )
+                # plt.scatter([x*256 for x, y in polygon], [y*256 for x, y in polygon])
+                # polygon = []
+                break
+            else:
+                polygon.append((sequence[i][0], sequence[i][1]))
+
+            i += 1
+
         print('\n'.join(str(k) + ' --> ' + str(list(target[k].shape)) for k in target))
 
+        plt.legend()
         plt.show()
 
         break
