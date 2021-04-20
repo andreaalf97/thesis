@@ -68,11 +68,48 @@ class DETR(nn.Module):
 
         src, mask = features[-1].decompose()
         assert mask is not None
+        assert tgt is not None, "Target sequence is expected to be passed to the model during training and evaluation"
 
-        if self.training:
-            assert tgt is not None, "Target sequence is expected to be passed to the model during training"
-        else:
-            assert tgt is None, "Target sequence is NOT expected to be passed to the model during testing"
+        if not self.training:
+
+            tgt = tgt[:, 0, :].unsqueeze(1)  # During evaluation we only pass the start token and use the predictions
+
+            src = self.input_proj(src)
+            mask = mask
+            query_embed = self.query_embed.weight
+            pos_embed = pos[-1]
+
+            bs, c, h, w = src.shape
+            src = src.flatten(2).permute(2, 0, 1)
+            pos_embed = pos_embed.flatten(2).permute(2, 0, 1)
+            query_embed = query_embed.unsqueeze(1).repeat(1, bs, 1)
+            mask = mask.flatten(1)
+
+            memory = self.transformer.encoder(src, src_key_padding_mask=mask, pos=pos_embed)
+
+            ended = [False for _ in range(bs)]
+            while False in ended and tgt.shape[1] < 30:
+                hs = self.transformer.decoder(tgt.permute(1, 0, 2), memory, memory_key_padding_mask=mask,
+                                  pos=pos_embed, query_pos=pos_embed[:tgt.shape[1], :, :])
+                new_element = hs.transpose(1, 2)[0, :, -1, :]  # [2, 1, 256]
+
+                pred_class = torch.argmax(self.class_embed(new_element), dim=1)
+                pred_coord = self.bbox_embed(new_element).sigmoid()
+
+                new_tensor = []
+                for i, (batch_class, batch_coord) in enumerate(zip(pred_class, pred_coord)):
+                    t = torch.zeros(256).to(tgt.device)
+                    t[2 + batch_class] = 1
+                    if batch_class == 1:  # <point> class
+                        t[:2] = batch_coord
+                    if batch_class == 3:  # <end-of-computation> class
+                        ended[i] = True
+                    new_tensor.append(t)
+                new_tensor = torch.stack(new_tensor).unsqueeze(1)
+
+                tgt = torch.cat([tgt, new_tensor], dim=1)
+
+            return tgt[:, :, :6]
 
         hs = self.transformer(self.input_proj(src), mask, self.query_embed.weight, pos[-1], tgt=tgt)[0]
 
