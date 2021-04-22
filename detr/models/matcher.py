@@ -61,6 +61,43 @@ class HungarianMatcher(nn.Module):
                 pred_boxes --> [2, 10, 8, 3]
         """
 
+        print("#####################################")
+        print("---")
+        for i, batch in enumerate(targets):
+            keys = ['boxes', 'labels']
+            print(f"BATCH {i}")
+            print('\n'.join([str(k) + ' --> ' + str(batch[k].shape) for k in batch if k in keys]))
+            print("---")
+        print("#####################################")
+        print("pred_logits", outputs["pred_logits"].shape)
+        print("pred_boxes", outputs["pred_boxes"].shape)
+        print("#####################################")
+
+        for tgt, pred_logits, pred_boxes in zip(targets, outputs["pred_logits"], outputs["pred_boxes"]):
+            tgt_boxes = tgt['boxes']
+            tgt_labels = tgt['labels']
+            print("tgt_boxes", tgt_boxes.shape)
+            print("tgt_labels", tgt_labels.shape)
+            print("pred_logits", pred_logits.shape)
+            print("pred_boxes", pred_boxes.shape)
+
+            cost_matrix = torch.zeros(len(pred_logits), len(tgt_labels))
+
+            for i in range(len(pred_logits)):
+                for j in range(len(tgt_labels)):
+                    cost_matrix[i][j] = self.get_cost(pred_logits[i], pred_boxes[i], tgt_labels[j], tgt_boxes[j], self.cost_class, self.cost_bbox)
+                    break
+                break
+
+            print("#####################################")
+            print("COST MATRIX")
+            print(cost_matrix.shape)
+            print(cost_matrix)
+            print("#####################################")
+
+            break
+        exit(0)
+
         bs, num_queries = outputs["pred_logits"].shape[:2]
 
         # We flatten to compute the cost matrices in a batch
@@ -96,6 +133,24 @@ class HungarianMatcher(nn.Module):
         sizes = [len(v["boxes"]) for v in targets]
         indices = [linear_sum_assignment(c[i]) for i, c in enumerate(C.split(sizes, -1))]
         return [(torch.as_tensor(i, dtype=torch.int64), torch.as_tensor(j, dtype=torch.int64)) for i, j in indices]
+
+    def get_cost(self, pred_logits, pred_boxes, tgt_labels, tgt_boxes, cost_class, cost_bbox):
+
+        print("############################")
+        print("COST CLASS", cost_class)
+        print("COST BOX", cost_bbox)
+        print("Matching:")
+        print("pred_logits", pred_logits)
+        print("pred_boxes", pred_boxes)
+
+        i = 0
+        while tgt_boxes[i] != -1:
+            i += 1
+        tgt_boxes = tgt_boxes[:i]
+        print("tgt_labels", tgt_labels)
+        print("tgt_boxes", tgt_boxes)
+
+        return 1.0
 
 
 def build_matcher(args):
