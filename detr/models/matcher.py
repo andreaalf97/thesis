@@ -140,15 +140,26 @@ class HungarianMatcher(nn.Module):
         print("COST CLASS", cost_class)
         print("COST BOX", cost_bbox)
         print("Matching:")
-        print("pred_logits", pred_logits)
-        print("pred_boxes", pred_boxes)
+
+        class_cost = 1 - torch.softmax(pred_logits, dim=0)[tgt_labels]
+        print("COST CLASSIFICATION:", class_cost)
 
         i = 0
         while tgt_boxes[i] != -1:
             i += 1
         tgt_boxes = tgt_boxes[:i]
         print("tgt_labels", tgt_labels)
+        tgt_boxes = tgt_boxes.view(-1, 2)
+        tgt_boxes = torch.cat([tgt_boxes, torch.zeros(tgt_boxes.shape[0], 1).to(tgt_boxes.device)], dim=1)
+        print("tgt_boxes", tgt_boxes.shape)
         print("tgt_boxes", tgt_boxes)
+
+        pred_boxes = pred_boxes[:len(tgt_boxes), :]
+        print("pred_boxes", pred_boxes)
+
+        print("pred_logits", torch.softmax(pred_logits, dim=0))
+
+
 
         return 1.0
 
