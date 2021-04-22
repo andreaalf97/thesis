@@ -398,7 +398,9 @@ if __name__ == '__main__':
     tot = 0
 
     for index, (image, target) in enumerate(ds):
-        # plt.imshow(image.cpu().permute(1, 2, 0))
+        plt.imshow(image.cpu().permute(1, 2, 0))
+        plt.show()
+        continue
 
         if index > 1000:
             break
