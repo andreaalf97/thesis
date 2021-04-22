@@ -99,11 +99,10 @@ class PolyGate:
 
 def get_ts_image(height, width, num_gates=3, no_gate_chance=0.10, black_and_white=True, stroke=-1, num_corners=-1, clamp=True) -> (np.ndarray, list, list):
 
-    if num_gates == -1:
-        if random.random() < no_gate_chance:
-            num_gates = 0
-        else:
-            num_gates = random.randint(1, num_gates)
+    if random.random() < no_gate_chance:
+        num_gates = 0
+    else:
+        num_gates = random.randint(1, num_gates)
 
     img = get_ts_background(height, width, bgr=False, black_white=black_and_white)
 
