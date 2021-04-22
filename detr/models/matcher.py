@@ -134,15 +134,16 @@ class HungarianMatcher(nn.Module):
         indices = [linear_sum_assignment(c[i]) for i, c in enumerate(C.split(sizes, -1))]
         return [(torch.as_tensor(i, dtype=torch.int64), torch.as_tensor(j, dtype=torch.int64)) for i, j in indices]
 
-    def get_cost(self, pred_logits, pred_boxes, tgt_labels, tgt_boxes, cost_class, cost_bbox):
+    def get_cost(self, a, b, c, d, cost_class, cost_bbox):
 
+        pred_logits, pred_boxes, tgt_labels, tgt_boxes = \
+            a.clone(), b.clone(), c.clone(), d.clone()
         print("############################")
         print("COST CLASS", cost_class)
         print("COST BOX", cost_bbox)
         print("Matching:")
 
         class_cost = 1 - torch.softmax(pred_logits, dim=0)[tgt_labels]
-        print("COST CLASSIFICATION:", class_cost)
 
         i = 0
         while tgt_boxes[i] != -1:
@@ -154,14 +155,28 @@ class HungarianMatcher(nn.Module):
         print("tgt_boxes", tgt_boxes.shape)
         print("tgt_boxes", tgt_boxes)
 
-        pred_boxes = pred_boxes[:len(tgt_boxes), :]
+        print("pred_logits", torch.softmax(pred_logits, dim=0))
         print("pred_boxes", pred_boxes)
 
-        print("pred_logits", torch.softmax(pred_logits, dim=0))
+        pred_boxes_points_only = pred_boxes[:len(tgt_boxes), :]
+        print("pred_boxes_points_only", pred_boxes_points_only)
 
+        cost_matrix_coord = torch.zeros(len(pred_boxes_points_only), len(tgt_boxes))
 
+        for i in range(len(pred_boxes_points_only)):
+            for j in range(len(tgt_boxes)):
+                cost_matrix_coord[i][j] = torch.abs(pred_boxes_points_only[i] - tgt_boxes[j]).sum()
 
-        return 1.0
+        ind_pred, ind_tgt = linear_sum_assignment(cost_matrix_coord)
+
+        print("POINT COST MATRIX:")
+        print(cost_matrix_coord)
+        print(ind_pred, ind_tgt)
+
+        tgt_boxes = torch.cat([tgt_boxes[ind_tgt, :], torch.tensor([0.0, 0.0, 1.0]).to(tgt_boxes.device).expand(len(pred_boxes) - len(tgt_boxes), 3)], dim=0)
+        bbox_cost = torch.cdist(tgt_boxes, pred_boxes, 1)
+
+        return cost_class*class_cost + cost_bbox*bbox_cost
 
 
 def build_matcher(args):
