@@ -62,8 +62,14 @@ class Transformer(nn.Module):
         # tgt = torch.zeros_like(query_embed)
 
         memory = self.encoder(src, src_key_padding_mask=mask, pos=pos_embed)
+
+        query_pos = pos_embed.repeat(2, 1, 1)
+
+        while query_pos.shape[0] < tgt.shape[1]:
+            query_pos = query_pos.repeat(2, 1, 1)
+
         hs = self.decoder(tgt.permute(1, 0, 2), memory, memory_key_padding_mask=mask,
-                          pos=pos_embed, query_pos=pos_embed[:tgt.shape[1], :, :])
+                          pos=pos_embed, query_pos=query_pos[:tgt.shape[1], :, :])
         return hs.transpose(1, 2), memory.permute(1, 2, 0).view(bs, c, h, w)
 
 
