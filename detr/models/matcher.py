@@ -60,40 +60,37 @@ class HungarianMatcher(nn.Module):
                 pred_logits --> [2, 10, 2]
                 pred_boxes --> [2, 10, 8, 3]
         """
-
-        print("#####################################")
-        print("---")
-        for i, batch in enumerate(targets):
-            keys = ['boxes', 'labels']
-            print(f"BATCH {i}")
-            print('\n'.join([str(k) + ' --> ' + str(batch[k].shape) for k in batch if k in keys]))
-            print("---")
-        print("#####################################")
-        print("pred_logits", outputs["pred_logits"].shape)
-        print("pred_boxes", outputs["pred_boxes"].shape)
-        print("#####################################")
-
         for tgt, pred_logits, pred_boxes in zip(targets, outputs["pred_logits"], outputs["pred_boxes"]):
             tgt_boxes = tgt['boxes']
             tgt_labels = tgt['labels']
-            print("tgt_boxes", tgt_boxes.shape)
-            print("tgt_labels", tgt_labels.shape)
+
+            print("#####################################")
+            print("CREATING COST MATRIX FOR:")
             print("pred_logits", pred_logits.shape)
             print("pred_boxes", pred_boxes.shape)
+            print("tgt_boxes", tgt_boxes.shape)
+            print("tgt_labels", tgt_labels.shape)
+            print("#####################################")
+
 
             cost_matrix = torch.zeros(len(pred_logits), len(tgt_labels))
 
             for i in range(len(pred_logits)):
                 for j in range(len(tgt_labels)):
-                    cost_matrix[i][j] = self.get_cost(pred_logits[i], pred_boxes[i], tgt_labels[j], tgt_boxes[j], self.cost_class, self.cost_bbox)
-                    break
-                break
+                    cost_matrix[i, j] = self.get_cost(pred_logits[i], pred_boxes[i], tgt_labels[j], tgt_boxes[j], self.cost_class, self.cost_bbox)
 
             print("#####################################")
-            print("COST MATRIX")
+            print(" FINAL COST MATRIX")
             print(cost_matrix.shape)
             print(cost_matrix)
             print("#####################################")
+
+            pred_indices, tgt_indices = linear_sum_assignment(cost_matrix)
+            print("PREDICTION INDICES:", pred_indices)
+            print("TARGET INDICES:", tgt_indices)
+
+            indices = torch.tensor([[torch.as_tensor(p, dtype=torch.int64), torch.as_tensor(t, dtype=torch.int64)] for p, t in zip(pred_indices, tgt_indices)])
+            print(indices)
 
             break
         exit(0)
@@ -138,43 +135,59 @@ class HungarianMatcher(nn.Module):
 
         pred_logits, pred_boxes, tgt_labels, tgt_boxes = \
             a.clone(), b.clone(), c.clone(), d.clone()
-        print("############################")
-        print("COST CLASS", cost_class)
-        print("COST BOX", cost_bbox)
-        print("Matching:")
+
+        # print("#########################")
+        # print("COMPARING:")
+        # print("pred_logits:\n", torch.softmax(pred_logits, dim=0))
+        # print("pred_boxes:\n", pred_boxes)
+        # print("tgt_labels:\n", tgt_labels)
 
         class_cost = 1 - torch.softmax(pred_logits, dim=0)[tgt_labels]
 
+        # First we remove the points in target that are just for padding (-1 is used for padding)
         i = 0
-        while tgt_boxes[i] != -1:
+        while i < len(tgt_boxes) and tgt_boxes[i] != -1:
             i += 1
         tgt_boxes = tgt_boxes[:i]
-        print("tgt_labels", tgt_labels)
+
+        # Then we reshape the target to have shape [num_points, 2]
+        # and we add the 3rd element representing the "CONTINUE" class
         tgt_boxes = tgt_boxes.view(-1, 2)
         tgt_boxes = torch.cat([tgt_boxes, torch.zeros(tgt_boxes.shape[0], 1).to(tgt_boxes.device)], dim=1)
-        print("tgt_boxes", tgt_boxes.shape)
-        print("tgt_boxes", tgt_boxes)
 
-        print("pred_logits", torch.softmax(pred_logits, dim=0))
-        print("pred_boxes", pred_boxes)
+        # print("tgt_boxes:\n", tgt_boxes)
+        # print("#########################")
 
+        # If there are n corners in the polygon, we keep only the first n predictions of the RNN
         pred_boxes_points_only = pred_boxes[:len(tgt_boxes), :]
-        print("pred_boxes_points_only", pred_boxes_points_only)
 
+        # We initialize the point-to-point cost matrix for this polygon
         cost_matrix_coord = torch.zeros(len(pred_boxes_points_only), len(tgt_boxes))
 
+        # The cost between two matching points is just the L1 loss
         for i in range(len(pred_boxes_points_only)):
             for j in range(len(tgt_boxes)):
                 cost_matrix_coord[i][j] = torch.abs(pred_boxes_points_only[i] - tgt_boxes[j]).sum()
 
+        # print("COST MATRIX for this polygon:")
+        # print(cost_matrix_coord)
+
         ind_pred, ind_tgt = linear_sum_assignment(cost_matrix_coord)
 
-        print("POINT COST MATRIX:")
-        print(cost_matrix_coord)
-        print(ind_pred, ind_tgt)
+        # print("Predition indices:", ind_pred)
+        # print("Target indices:", ind_tgt)
 
         tgt_boxes = torch.cat([tgt_boxes[ind_tgt, :], torch.tensor([0.0, 0.0, 1.0]).to(tgt_boxes.device).expand(len(pred_boxes) - len(tgt_boxes), 3)], dim=0)
-        bbox_cost = torch.cdist(tgt_boxes, pred_boxes, 1)
+
+        # print("Final tgt_boxes:", tgt_boxes)
+        # print("Final pred_boxes:", pred_boxes)
+
+        # bbox_cost = torch.cdist(tgt_boxes, pred_boxes, 1).sum()
+        bbox_cost = torch.abs(tgt_boxes - pred_boxes).sum()
+
+        # print("FINAL COST:")
+        # print(class_cost)
+        # print(bbox_cost)
 
         return cost_class*class_cost + cost_bbox*bbox_cost
 
