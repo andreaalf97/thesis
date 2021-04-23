@@ -60,17 +60,19 @@ class HungarianMatcher(nn.Module):
                 pred_logits --> [2, 10, 2]
                 pred_boxes --> [2, 10, 8, 3]
         """
+
+        batch_indices = []
         for tgt, pred_logits, pred_boxes in zip(targets, outputs["pred_logits"], outputs["pred_boxes"]):
             tgt_boxes = tgt['boxes']
             tgt_labels = tgt['labels']
 
-            print("#####################################")
-            print("CREATING COST MATRIX FOR:")
-            print("pred_logits", pred_logits.shape)
-            print("pred_boxes", pred_boxes.shape)
-            print("tgt_boxes", tgt_boxes.shape)
-            print("tgt_labels", tgt_labels.shape)
-            print("#####################################")
+            # print("#####################################")
+            # print("CREATING COST MATRIX FOR:")
+            # print("pred_logits", pred_logits.shape)
+            # print("pred_boxes", pred_boxes.shape)
+            # print("tgt_boxes", tgt_boxes.shape)
+            # print("tgt_labels", tgt_labels.shape)
+            # print("#####################################")
 
 
             cost_matrix = torch.zeros(len(pred_logits), len(tgt_labels))
@@ -79,21 +81,20 @@ class HungarianMatcher(nn.Module):
                 for j in range(len(tgt_labels)):
                     cost_matrix[i, j] = self.get_cost(pred_logits[i], pred_boxes[i], tgt_labels[j], tgt_boxes[j], self.cost_class, self.cost_bbox)
 
-            print("#####################################")
-            print(" FINAL COST MATRIX")
-            print(cost_matrix.shape)
-            print(cost_matrix)
-            print("#####################################")
+            # print("#####################################")
+            # print(" FINAL COST MATRIX")
+            # print(cost_matrix.shape)
+            # print(cost_matrix)
+            # print("#####################################")
 
             pred_indices, tgt_indices = linear_sum_assignment(cost_matrix)
-            print("PREDICTION INDICES:", pred_indices)
-            print("TARGET INDICES:", tgt_indices)
+            # print("PREDICTION INDICES:", pred_indices)
+            # print("TARGET INDICES:", tgt_indices)
 
             indices = torch.tensor([[torch.as_tensor(p, dtype=torch.int64), torch.as_tensor(t, dtype=torch.int64)] for p, t in zip(pred_indices, tgt_indices)])
-            print(indices)
+            batch_indices.append(indices)
 
-            break
-        exit(0)
+        return batch_indices
 
         bs, num_queries = outputs["pred_logits"].shape[:2]
 
