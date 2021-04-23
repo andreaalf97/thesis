@@ -61,37 +61,34 @@ class HungarianMatcher(nn.Module):
                 pred_boxes --> [2, 10, 8, 3]
         """
 
+        # We compute the matching for each batch
         batch_indices = []
         for tgt, pred_logits, pred_boxes in zip(targets, outputs["pred_logits"], outputs["pred_boxes"]):
             tgt_boxes = tgt['boxes']
             tgt_labels = tgt['labels']
 
-            # print("#####################################")
-            # print("CREATING COST MATRIX FOR:")
-            # print("pred_logits", pred_logits.shape)
-            # print("pred_boxes", pred_boxes.shape)
-            # print("tgt_boxes", tgt_boxes.shape)
-            # print("tgt_labels", tgt_labels.shape)
-            # print("#####################################")
+            # Now tgt_boxes, tgt_labels, pred_logits and pred_boxes all refer to one batch only
 
-
+            # We initialize the polygon-polygon cost matrix to 0
+            # it has shape [num of predictions, number of target polygons]
             cost_matrix = torch.zeros(len(pred_logits), len(tgt_labels))
+            # We also want to maintain the point-to-point matching of the polygons so we don't compute it again
+            point_to_point_matchings = [[[] for j in range(len(tgt_labels))] for i in range(len(pred_logits))]
 
+            # For each prediction-polygon pair we compute the cost
             for i in range(len(pred_logits)):
                 for j in range(len(tgt_labels)):
-                    cost_matrix[i, j] = self.get_cost(pred_logits[i], pred_boxes[i], tgt_labels[j], tgt_boxes[j], self.cost_class, self.cost_bbox)
+                    cost_matrix[i, j], point_to_point_matchings[i][j] = self.get_cost(
+                        pred_logits[i], pred_boxes[i],
+                        tgt_labels[j], tgt_boxes[j],
+                        self.cost_class, self.cost_bbox
+                    )
 
-            # print("#####################################")
-            # print(" FINAL COST MATRIX")
-            # print(cost_matrix.shape)
-            # print(cost_matrix)
-            # print("#####################################")
-
+            # We find the bipartite matching that minimizes the cost
             pred_indices, tgt_indices = linear_sum_assignment(cost_matrix)
-            # print("PREDICTION INDICES:", pred_indices)
-            # print("TARGET INDICES:", tgt_indices)
 
-            indices = torch.tensor([[torch.as_tensor(p, dtype=torch.int64), torch.as_tensor(t, dtype=torch.int64)] for p, t in zip(pred_indices, tgt_indices)])
+            # We return a list of tuples (index of prediction, index of target polygon) for the correct matchings
+            indices = [(p, t, point_to_point_matchings[p][t]) for p, t in zip(pred_indices, tgt_indices)]
             batch_indices.append(indices)
 
         return batch_indices
@@ -132,17 +129,17 @@ class HungarianMatcher(nn.Module):
         indices = [linear_sum_assignment(c[i]) for i, c in enumerate(C.split(sizes, -1))]
         return [(torch.as_tensor(i, dtype=torch.int64), torch.as_tensor(j, dtype=torch.int64)) for i, j in indices]
 
-    def get_cost(self, a, b, c, d, cost_class, cost_bbox):
+    @torch.no_grad()
+    def get_cost(self, a, b, c, d, weight_class, weight_bbox):
+        """
+            This function computes the cost of a prediction polygon and a target polygon by matching
+            each predicted point (they are NOT ordered but the sequence ends with a special token)
+        """
 
         pred_logits, pred_boxes, tgt_labels, tgt_boxes = \
             a.clone(), b.clone(), c.clone(), d.clone()
 
-        # print("#########################")
-        # print("COMPARING:")
-        # print("pred_logits:\n", torch.softmax(pred_logits, dim=0))
-        # print("pred_boxes:\n", pred_boxes)
-        # print("tgt_labels:\n", tgt_labels)
-
+        # The CLASSIFICATION loss is just (1 - prob) for the correct class
         class_cost = 1 - torch.softmax(pred_logits, dim=0)[tgt_labels]
 
         # First we remove the points in target that are just for padding (-1 is used for padding)
@@ -151,13 +148,10 @@ class HungarianMatcher(nn.Module):
             i += 1
         tgt_boxes = tgt_boxes[:i]
 
-        # Then we reshape the target to have shape [num_points, 2]
+        # Then we reshape the target tensor to have shape [num_points, 2]
         # and we add the 3rd element representing the "CONTINUE" class
         tgt_boxes = tgt_boxes.view(-1, 2)
         tgt_boxes = torch.cat([tgt_boxes, torch.zeros(tgt_boxes.shape[0], 1).to(tgt_boxes.device)], dim=1)
-
-        # print("tgt_boxes:\n", tgt_boxes)
-        # print("#########################")
 
         # If there are n corners in the polygon, we keep only the first n predictions of the RNN
         pred_boxes_points_only = pred_boxes[:len(tgt_boxes), :]
@@ -170,27 +164,15 @@ class HungarianMatcher(nn.Module):
             for j in range(len(tgt_boxes)):
                 cost_matrix_coord[i][j] = torch.abs(pred_boxes_points_only[i] - tgt_boxes[j]).sum()
 
-        # print("COST MATRIX for this polygon:")
-        # print(cost_matrix_coord)
-
+        # We find the optimal bipartite matching between the points of the prediction polygon and the target polygon
         ind_pred, ind_tgt = linear_sum_assignment(cost_matrix_coord)
 
-        # print("Predition indices:", ind_pred)
-        # print("Target indices:", ind_tgt)
-
+        # We add to the target sequence <end-of-polygon> tokens to show the architecture how to end the polygon sentence
         tgt_boxes = torch.cat([tgt_boxes[ind_tgt, :], torch.tensor([0.0, 0.0, 1.0]).to(tgt_boxes.device).expand(len(pred_boxes) - len(tgt_boxes), 3)], dim=0)
 
-        # print("Final tgt_boxes:", tgt_boxes)
-        # print("Final pred_boxes:", pred_boxes)
-
-        # bbox_cost = torch.cdist(tgt_boxes, pred_boxes, 1).sum()
         bbox_cost = torch.abs(tgt_boxes - pred_boxes).sum()
 
-        # print("FINAL COST:")
-        # print(class_cost)
-        # print(bbox_cost)
-
-        return cost_class*class_cost + cost_bbox*bbox_cost
+        return weight_class * class_cost + weight_bbox * bbox_cost, [(p, t) for p, t in zip(ind_pred, ind_tgt)]
 
 
 def build_matcher(args):

@@ -125,6 +125,23 @@ class SetCriterion(nn.Module):
         targets dicts must contain the key "labels" containing a tensor of dim [nb_target_boxes]
         """
         assert 'pred_logits' in outputs
+
+        print("COMPUTING CLASSIFICATION LOSS:")
+        print("outputs", outputs['pred_logits'].shape)
+        print(f"targets: list of dicts of lenght {len(targets)} and shapes")
+        print(f"\t'boxes': {targets[0]['boxes'].shape}")
+        print(f"\t'labels': {targets[0]['labels'].shape}")
+
+        match = [torch.tensor([[m[0], m[1]] for m in batch]) for batch in indices]
+
+        print("indices", match)
+        print("######################################")
+
+
+
+
+        return {'loss_ce': 0}
+
         src_logits = outputs['pred_logits']
 
         idx = self._get_src_permutation_idx(indices)
@@ -146,6 +163,12 @@ class SetCriterion(nn.Module):
         """ Compute the cardinality error, ie the absolute error in the number of predicted non-empty boxes
         This is not really a loss, it is intended for logging purposes only. It doesn't propagate gradients
         """
+
+        print("COMPUTING CARDINALITY LOSS")
+        print("######################################")
+
+        return {'cardinality_error': 0}
+
         pred_logits = outputs['pred_logits']
         device = pred_logits.device
         tgt_lengths = torch.as_tensor([len(v["labels"]) for v in targets], device=device)
@@ -164,6 +187,16 @@ class SetCriterion(nn.Module):
                 The target boxes are expected in format (x0, y0, x1, y1, x2, y2, x3, y3), normalized by the image size.
         """
         assert 'pred_boxes' in outputs
+
+        print("COMPUTING COORDINATES LOSS:")
+        print("outputs", outputs['pred_boxes'].shape)
+        print(f"targets: list of dicts of lenght {len(targets)} and shapes")
+        print(f"\t'boxes': {targets[0]['boxes'].shape}")
+        print(f"\t'labels': {targets[0]['labels'].shape}")
+        print("indices", indices)
+        print("######################################")
+        return {'loss_bbox': 0}
+
         idx = self._get_src_permutation_idx(indices)
         src_boxes = outputs['pred_boxes'][idx]
         target_boxes = torch.cat([t['boxes'][i] for t, (_, i) in zip(targets, indices)], dim=0)
@@ -260,9 +293,6 @@ class SetCriterion(nn.Module):
         # Retrieve the matching between the outputs of the last layer and the targets
         indices = self.matcher(outputs_without_aux, targets)
 
-        print("INDICES", indices)
-        exit(0)
-
         # Compute the average number of target boxes across all nodes, for normalization purposes
         num_boxes = sum(len(t["labels"]) for t in targets)
         num_boxes = torch.as_tensor([num_boxes], dtype=torch.float, device=next(iter(outputs.values())).device)
@@ -274,6 +304,10 @@ class SetCriterion(nn.Module):
         losses = {}
         for loss in self.losses:  # losses = ['labels', 'boxes', 'cardinality']
             losses.update(self.get_loss(loss, outputs, targets, indices, num_boxes))
+
+        print("LOSSES:")
+        print(losses)
+        exit(0)
 
         # In case of auxiliary losses, we repeat this process with the output of each intermediate layer.
         if 'aux_outputs' in outputs:
