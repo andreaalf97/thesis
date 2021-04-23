@@ -86,6 +86,7 @@ def get_args_parser():
     parser.add_argument('--coco_path', type=str, default="")  # /home/andreaalf/Documents/detr/coco_dataset
     parser.add_argument('--coco_panoptic_path', type=str)
     parser.add_argument('--remove_difficult', action='store_true')
+    parser.add_argument('--num_gates', default=4, type=int)
 
     # Args for REAL GATE Dataset
     parser.add_argument('--real_gate_path', type=str,

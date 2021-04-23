@@ -77,6 +77,8 @@ class PolyGate:
         else:
             raise Exception(f"Color {color} not supported")
 
+        self.valid = validate_poly(self.corners)
+
     def get_labels(self) -> list:
         labels = []
 
@@ -113,8 +115,12 @@ def get_ts_image(height, width, num_gates=3, no_gate_chance=0.10, black_and_whit
     for _ in range(num_gates):
         if black_and_white:
             gate = PolyGate(height, width, color='white', stroke=stroke, num_corners=num_corners, clamp=clamp)
+            while not gate.valid:
+                gate = PolyGate(height, width, color='white', stroke=stroke, num_corners=num_corners, clamp=clamp)
         else:
             gate = PolyGate(height, width, color='none', stroke=stroke, num_corners=num_corners, clamp=clamp)
+            while not gate.valid:
+                gate = PolyGate(height, width, color='none', stroke=stroke, num_corners=num_corners, clamp=clamp)
 
         labels.append(gate.get_labels())
         areas.append(gate.get_area())
@@ -146,6 +152,52 @@ def print_polygate(img: np.ndarray, gate: PolyGate) -> np.ndarray:
     )
 
     return img
+
+
+def validate_poly(corners):
+
+    if len(corners) == 3:
+        return True
+
+    lines = []
+
+    # Create list of lines
+    lines.append([corners[0], corners[1]])
+    for i in range(1, len(corners)-1):
+        lines.append([corners[i], corners[i+1]])
+    lines.append([corners[-1], corners[0]])
+
+    for i in range(len(lines)):
+        temp_lines = lines.copy()
+        temp_lines.remove(lines[i + 1] if i + 1 < len(lines) else lines[0])
+        temp_lines.remove(lines[i])
+        temp_lines.remove(lines[i - 1])
+
+        for line_2 in temp_lines:
+            if line_intersection(lines[i], line_2):
+                return False
+
+    return True
+
+
+def line_intersection(line1, line2):
+
+    a, b = line1
+    c, d = line2
+
+    if clockwise(a, b, c) * clockwise(a, b, d) > 0:
+        return False
+    if clockwise(c, d, a) * clockwise(c, d, b) > 0:
+        return False
+    return True
+
+
+def clockwise(a, b, c):
+    ax, ay = a
+    bx, by = b
+    cx, cy = c
+
+    return (bx - ax) * (cy - ay) - (cx - ax) * (by - ay)
 
 
 def get_ts_background(height, width, bgr=False, black_white=False) -> np.ndarray:
@@ -397,29 +449,36 @@ if __name__ == '__main__':
 
     tot = 0
 
-    for index, (image, target) in enumerate(ds):
-        plt.imshow(image.cpu().permute(1, 2, 0))
-        plt.show()
-        continue
+    iter = 10000
 
-        if index > 1000:
-            break
-        if index % 10 == 0:
+    for index, (image, target) in enumerate(ds):
+
+        if index % int(iter/100) == 0:
             print(index)
 
-        sequence = target['sequence']
-        classes = torch.argmax(sequence[:, 2:6], dim=1)
-
-        start += torch.where(classes == 0, 1, 0).sum().item()
-        point += torch.where(classes == 1, 1, 0).sum().item()
-        end_poly += torch.where(classes == 2, 1, 0).sum().item()
-        end += torch.where(classes == 3, 1, 0).sum().item()
-        tot += 26
+        if index > iter:
+            print(f"No errors in {iter} iterations")
+            break
         continue
-    print("START:", float(start)/tot)
-    print("POINT:", float(point)/tot)
-    print("END_POLY:", float(end_poly)/tot)
-    print("END:", float(end)/tot)
+
+    #     if index > 1000:
+    #         break
+    #     if index % 10 == 0:
+    #         print(index)
+    #
+    #     sequence = target['sequence']
+    #     classes = torch.argmax(sequence[:, 2:6], dim=1)
+    #
+    #     start += torch.where(classes == 0, 1, 0).sum().item()
+    #     point += torch.where(classes == 1, 1, 0).sum().item()
+    #     end_poly += torch.where(classes == 2, 1, 0).sum().item()
+    #     end += torch.where(classes == 3, 1, 0).sum().item()
+    #     tot += 26
+    #     continue
+    # print("START:", float(start)/tot)
+    # print("POINT:", float(point)/tot)
+    # print("END_POLY:", float(end_poly)/tot)
+    # print("END:", float(end)/tot)
 
         # i = 0
         # while sequence[i][2 + CLASSES['<point>']] != 1:
