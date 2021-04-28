@@ -126,46 +126,46 @@ class SetCriterion(nn.Module):
         """
         assert 'pred_logits' in outputs
 
-        print("COMPUTING CLASSIFICATION LOSS:")
-        print("outputs", outputs['pred_logits'].shape)
-        print(f"targets: list of dicts of lenght {len(targets)} and shapes")
-        print(f"\t'boxes': {targets[0]['boxes'].shape}")
-        print(f"\t'labels': {targets[0]['labels'].shape}")
+        # From the matching tensor we remove the indices of the point-to-point matching
+        match = [torch.tensor([[m[0], m[1]] for m in batch], dtype=torch.int64) for batch in indices]
 
-        match = [torch.tensor([[m[0], m[1]] for m in batch]) for batch in indices]
+        # We create the target tensor by looking at the matching indices
+        class_tgt = torch.full(
+            outputs['pred_logits'].shape[:2], self.num_classes,
+            dtype=torch.int64, device=outputs['pred_logits'].device
+        )
 
-        print("indices", match)
-        print("######################################")
+        # We set the correct target class for each batch on the target tensor
+        for i, (ind_batch, target) in enumerate(zip(match, [t['labels'] for t in targets])):
+            class_tgt[i, ind_batch[:, 0]] = target[ind_batch[:, 1]]
 
-
-
-
-        return {'loss_ce': 0}
-
-        src_logits = outputs['pred_logits']
-
-        idx = self._get_src_permutation_idx(indices)
-        target_classes_o = torch.cat([t["labels"][J] for t, (_, J) in zip(targets, indices)])
-        target_classes = torch.full(src_logits.shape[:2], self.num_classes,
-                                    dtype=torch.int64, device=src_logits.device)
-        target_classes[idx] = target_classes_o
-
-        loss_ce = F.cross_entropy(src_logits.transpose(1, 2), target_classes, self.empty_weight)
+        # We compute cross entropy loss and return it
+        loss_ce = F.cross_entropy(outputs['pred_logits'].transpose(1, 2), class_tgt, self.empty_weight)
         losses = {'loss_ce': loss_ce}
 
-        if log:
-            # TODO this should probably be a separate loss, not hacked in this one here
-            losses['class_error'] = 100 - accuracy(src_logits[idx], target_classes_o)[0]
         return losses
+
+        # src_logits = outputs['pred_logits']
+        #
+        # idx = self._get_src_permutation_idx(indices)
+        # target_classes_o = torch.cat([t["labels"][J] for t, (_, J) in zip(targets, indices)])
+        # target_classes = torch.full(src_logits.shape[:2], self.num_classes,
+        #                             dtype=torch.int64, device=src_logits.device)
+        # target_classes[idx] = target_classes_o
+        #
+        # loss_ce = F.cross_entropy(src_logits.transpose(1, 2), target_classes, self.empty_weight)
+        # losses = {'loss_ce': loss_ce}
+        #
+        # if log:
+        #     # TODO this should probably be a separate loss, not hacked in this one here
+        #     losses['class_error'] = 100 - accuracy(src_logits[idx], target_classes_o)[0]
+        # return losses
 
     @torch.no_grad()
     def loss_cardinality(self, outputs, targets, indices, num_boxes):
         """ Compute the cardinality error, ie the absolute error in the number of predicted non-empty boxes
         This is not really a loss, it is intended for logging purposes only. It doesn't propagate gradients
         """
-
-        print("COMPUTING CARDINALITY LOSS")
-        print("######################################")
 
         return {'cardinality_error': 0}
 
@@ -188,14 +188,30 @@ class SetCriterion(nn.Module):
         """
         assert 'pred_boxes' in outputs
 
-        print("COMPUTING COORDINATES LOSS:")
-        print("outputs", outputs['pred_boxes'].shape)
-        print(f"targets: list of dicts of lenght {len(targets)} and shapes")
-        print(f"\t'boxes': {targets[0]['boxes'].shape}")
-        print(f"\t'labels': {targets[0]['labels'].shape}")
-        print("indices", indices)
-        print("######################################")
-        return {'loss_bbox': 0}
+        # Initialize loss as zero
+        loss = torch.as_tensor(0, device=outputs['pred_boxes'].device, dtype=torch.float32)
+
+        # For each batch
+        for pred_boxes, target, index in zip(outputs['pred_boxes'], targets, indices):
+            tgt_boxes = target['boxes']
+            # We reshape the target to have each point in a row
+            tgt_boxes = tgt_boxes.view(tgt_boxes.shape[0], -1, 2)
+
+            for match in index:
+                # For each object query, we compute the loss by matching point to point
+                p, t, corners_matching = match
+                corners_matching = [x[1] for x in corners_matching]
+                tgt = tgt_boxes[t, corners_matching]
+                tgt = torch.cat([tgt, torch.zeros(tgt.shape[0], 1).to(tgt.device)], dim=1)
+                padding = torch.zeros(pred_boxes[p].shape[0] - tgt.shape[0], 3).to(tgt.device)
+                padding[:, 2] = 1
+                padding[:, :2] = pred_boxes[p, -len(padding):, :2]
+                tgt = torch.cat([tgt, padding], dim=0)
+
+                loss += F.l1_loss(pred_boxes[p], tgt, reduction='sum')
+
+        losses = {'loss_bbox': loss / num_boxes}
+        return losses
 
         idx = self._get_src_permutation_idx(indices)
         src_boxes = outputs['pred_boxes'][idx]
@@ -304,10 +320,6 @@ class SetCriterion(nn.Module):
         losses = {}
         for loss in self.losses:  # losses = ['labels', 'boxes', 'cardinality']
             losses.update(self.get_loss(loss, outputs, targets, indices, num_boxes))
-
-        print("LOSSES:")
-        print(losses)
-        exit(0)
 
         # In case of auxiliary losses, we repeat this process with the output of each intermediate layer.
         if 'aux_outputs' in outputs:
