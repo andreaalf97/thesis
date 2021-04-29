@@ -9,7 +9,18 @@ import torchvision.transforms as T
 import matplotlib.pyplot as plt
 
 
+CLASSES = {
+    "<start>": 0,
+    "<point>": 1,
+    "<end-of-polygon>": 2,
+    "<end-of-computation>": 3
+}
+
 class PolyGate:
+
+    MIN_CORNERS = 3
+    MAX_CORNERS = 7
+
     def __init__(self, image_height, image_width, color='none', num_corners=-1, stroke=-1, clamp=True):
 
         self.image_height, self.image_width = image_height, image_width
@@ -23,7 +34,7 @@ class PolyGate:
         self.radius = image_height * radius_perc
 
         if num_corners == -1:
-            num_corners = random.randint(3, 8)
+            num_corners = random.randint(self.MIN_CORNERS, self.MAX_CORNERS)
 
         self.corners = []
 
@@ -33,7 +44,7 @@ class PolyGate:
             x = self.c_x + self.radius * math.cos(alpha)
             y = self.c_y + self.radius * math.sin(alpha)
             slope = math.tan(alpha) if alpha != math.pi/2 else math.tan(alpha + 0.001)
-            delta_x = random.uniform(0.0, math.sqrt(self.radius))
+            delta_x = random.uniform(0.0, math.sqrt(self.radius)/2)
             delta_y = slope * delta_x
 
             final_x = int(x+delta_x)
@@ -66,12 +77,18 @@ class PolyGate:
         else:
             raise Exception(f"Color {color} not supported")
 
+        self.valid = validate_poly(self.corners)
+
     def get_labels(self) -> list:
         labels = []
 
         for corner in self.corners:
             labels.append(corner[0]/self.image_width)
             labels.append(corner[1]/self.image_height)
+
+        if self.num_corners == -1:
+            while len(labels) != 2*self.MAX_CORNERS:
+                labels.append(-1)
 
         return labels
 
@@ -84,11 +101,10 @@ class PolyGate:
 
 def get_ts_image(height, width, num_gates=3, no_gate_chance=0.10, black_and_white=True, stroke=-1, num_corners=-1, clamp=True) -> (np.ndarray, list, list):
 
-    if num_gates == -1:
-        if random.random() < no_gate_chance:
-            num_gates = 0
-        else:
-            num_gates = random.randint(1, num_gates)
+    if random.random() < no_gate_chance:
+        num_gates = 0
+    else:
+        num_gates = random.randint(1, num_gates)
 
     img = get_ts_background(height, width, bgr=False, black_white=black_and_white)
 
@@ -99,8 +115,12 @@ def get_ts_image(height, width, num_gates=3, no_gate_chance=0.10, black_and_whit
     for _ in range(num_gates):
         if black_and_white:
             gate = PolyGate(height, width, color='white', stroke=stroke, num_corners=num_corners, clamp=clamp)
+            while not gate.valid:
+                gate = PolyGate(height, width, color='white', stroke=stroke, num_corners=num_corners, clamp=clamp)
         else:
             gate = PolyGate(height, width, color='none', stroke=stroke, num_corners=num_corners, clamp=clamp)
+            while not gate.valid:
+                gate = PolyGate(height, width, color='none', stroke=stroke, num_corners=num_corners, clamp=clamp)
 
         labels.append(gate.get_labels())
         areas.append(gate.get_area())
@@ -132,6 +152,52 @@ def print_polygate(img: np.ndarray, gate: PolyGate) -> np.ndarray:
     )
 
     return img
+
+
+def validate_poly(corners):
+
+    if len(corners) == 3:
+        return True
+
+    lines = []
+
+    # Create list of lines
+    lines.append([corners[0], corners[1]])
+    for i in range(1, len(corners)-1):
+        lines.append([corners[i], corners[i+1]])
+    lines.append([corners[-1], corners[0]])
+
+    for i in range(len(lines)):
+        temp_lines = lines.copy()
+        temp_lines.remove(lines[i + 1] if i + 1 < len(lines) else lines[0])
+        temp_lines.remove(lines[i])
+        temp_lines.remove(lines[i - 1])
+
+        for line_2 in temp_lines:
+            if line_intersection(lines[i], line_2):
+                return False
+
+    return True
+
+
+def line_intersection(line1, line2):
+
+    a, b = line1
+    c, d = line2
+
+    if clockwise(a, b, c) * clockwise(a, b, d) > 0:
+        return False
+    if clockwise(c, d, a) * clockwise(c, d, b) > 0:
+        return False
+    return True
+
+
+def clockwise(a, b, c):
+    ax, ay = a
+    bx, by = b
+    cx, cy = c
+
+    return (bx - ax) * (cy - ay) - (cx - ax) * (by - ay)
 
 
 def get_ts_background(height, width, bgr=False, black_white=False) -> np.ndarray:
@@ -198,6 +264,70 @@ class Clamp(object):
         return img, target
 
 
+class GetSentence(object):
+    def __init__(self, num_gates, num_corners):
+        self.num_gates = num_gates
+        self.num_corners = num_corners if num_corners != -1 else PolyGate.MAX_CORNERS
+
+    def __call__(self, sample):
+        img, target = sample
+
+        max_lenght = (self.num_gates * (self.num_corners+1)) + 2
+
+        centers = []
+        for polygon in target['boxes']:
+            index = len(polygon)
+            for i, value in enumerate(polygon):
+                if value == -1:
+                    index = i
+                    break
+            mean_x = polygon[:index:2].mean().item()
+            mean_y = polygon[1:index:2].mean().item()
+            centers.append((mean_x, mean_y))
+        centers = {i: c for i, c in enumerate(centers)}
+
+        sequence = []
+        start_token = torch.zeros(256)
+        start_token[2 + CLASSES['<start>']] = 1
+        sequence.append(start_token)
+
+        while len(centers) > 0:
+            min_center = [2, 2]
+            for index in centers:
+                x, y = centers[index]
+                if y < min_center[1]:
+                    min_center = (x, y)
+                    min_index = index
+                elif y == min_center[1] and x < min_center[0]:
+                    min_center = (x, y)
+                    min_index = index
+
+            polygon = target['boxes'][min_index]
+            for x, y in polygon.view(-1, 2):
+                if x == -1:
+                    break
+                token = torch.zeros(256)
+                token[2 + CLASSES['<point>']] = 1
+                token[0] = x
+                token[1] = y
+                sequence.append(token)
+            end_polygon = torch.zeros(256)
+            end_polygon[2 + CLASSES['<end-of-polygon>']] = 1
+            sequence.append(end_polygon)
+
+            centers.pop(min_index)
+
+        while len(sequence) < max_lenght:
+            end_computation = torch.zeros(256)
+            end_computation[2 + CLASSES['<end-of-computation>']] = 1
+            sequence.append(end_computation)
+
+        sequence = torch.stack(sequence)
+
+        target['sequence'] = sequence
+        return img, target
+
+
 class MaskRCNN(object):
     def __call__(self, sample):
         img, target = sample
@@ -248,13 +378,13 @@ class TSDataset(torch.utils.data.Dataset):
 
     std_transform = T.Compose([
         ToTensor(),
-        Clamp()
+        # Clamp()
     ])
 
     mask_transform = T.Compose([
         ToTensor(),
         MaskRCNN(),
-        Clamp()
+        # Clamp()
     ])
 
     def __init__(self, img_height, img_width, num_gates=3, black_and_white=True,
@@ -302,6 +432,8 @@ class TSDataset(torch.utils.data.Dataset):
 
         if self.transform:
             image, target = self.transform((image, target))
+            t = GetSentence(self.num_gates, self.num_corners)
+            image, target = t((image, target))
 
         return image, target
 
