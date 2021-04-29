@@ -34,8 +34,8 @@ class DETR(nn.Module):
         self.num_queries = num_queries
         self.transformer = transformer
         hidden_dim = transformer.d_model
-        self.class_embed = nn.Linear(hidden_dim, num_classes + 1)
-        self.bbox_embed = MLP(hidden_dim, hidden_dim, 8, 3)
+        self.class_embed = nn.Linear(hidden_dim, num_classes)
+        self.bbox_embed = MLP(hidden_dim, hidden_dim, 2, 3)
         self.query_embed = nn.Embedding(num_queries, hidden_dim)
         self.input_proj = nn.Conv2d(backbone.num_channels, hidden_dim, kernel_size=1)
         self.backbone = backbone
@@ -253,6 +253,10 @@ class SetCriterion(nn.Module):
 
         outputs_without_aux = {k: v for k, v in outputs.items() if k != 'aux_outputs'}
 
+        print("pred_logits", outputs_without_aux['pred_logits'].shape)
+        print("pred_boxes", outputs_without_aux['pred_boxes'].shape)
+        exit(0)
+
         # Retrieve the matching between the outputs of the last layer and the targets
         indices = self.matcher(outputs_without_aux, targets)
 
@@ -368,7 +372,7 @@ def build(args):
         # max_obj_id + 1, but the exact value doesn't really matter
         num_classes = 250
     if args.dataset_file == "toy_setting" or args.dataset_file == "real_gates":
-        num_classes = 1
+        num_classes = 4
     device = torch.device(args.device)
 
     backbone = build_backbone(args)
