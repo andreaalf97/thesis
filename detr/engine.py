@@ -248,6 +248,27 @@ def plot_image_with_labels(samples: torch.Tensor, targets: torch.Tensor, num_sam
 @torch.no_grad()
 def plot_prediction(samples: utils.NestedTensor, outputs: dict, targets: tuple):
 
+    for sample, logits, boxes in zip(samples.tensors, outputs['pred_logits'], outputs['pred_boxes']):
+
+        plt.imshow(sample.cpu().permute(1, 2, 0))
+
+        h, w = sample.shape[:2]
+
+        num_pred = 0
+        for logit, points in zip(logits, boxes):
+            if torch.argmax(logit) == 0:
+                num_pred += 1
+                i, x, y = 0, [], []
+                while i < len(points) and points[i][2] > 0:
+                    x.append(points[i][0].cpu().item()*256)
+                    y.append(points[i][1].cpu().item()*256)
+                    i += 1
+                plt.scatter(x, y)
+
+        plt.title(f"Predicted {num_pred} objects")
+        plt.show()
+        return
+
     logits_batch = outputs["pred_logits"]  # [batch_size, 100, 21]
     coords_batch = outputs["pred_boxes"]  # [batch_size, 100, 8]
 
@@ -612,8 +633,8 @@ def evaluate_map(model, data_loader_val, device, args):
         outputs = model(images)
         outputs = {k: v for k, v in outputs.items() if k != 'aux_outputs'}
 
-        # plot_prediction(images, outputs, targets)
-        # continue
+        plot_prediction(images, outputs, targets)
+        continue
 
         for pred_logits, pred_boxes, target in zip(outputs['pred_logits'], outputs['pred_boxes'], targets):  # For each image in the dataset
 
