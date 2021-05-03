@@ -8,6 +8,77 @@ from torch import nn
 
 from util.box_ops import box_cxcywh_to_xyxy, generalized_box_iou
 
+CLASSES = {
+    0: "<start>",
+    1: "<point>",
+    2: "<end-of-polygon>",
+    3: "<end-of-computation>"
+}
+
+
+@torch.no_grad()
+def get_polygons(logits_full: torch.Tensor, boxes: torch.Tensor) -> list:
+
+    logits = logits_full.argmax(-1)
+
+    i = 1
+    polygons = []
+    points = []
+    while i < len(logits) and logits[i] != 3:  # Keep going until <end-of-computation> token
+        if logits[i] == 1:  # If the prediction is a point, we add it to the point list of this polygon
+            points.append(boxes[i])
+        elif logits[i] in [2, 0]:  # <end-of-polygon> or <start>
+            if len(points) > 0:
+                polygons.append(torch.stack(points))
+            points = []
+        i += 1
+    return polygons
+
+
+@torch.no_grad()
+def get_sequence(polygons: list, target: dict):
+    """
+        This function takes the list of prediction polygons and the list of ground truth polygons of the same batch
+        and outputs the optimal target sequence after matching them.
+        What we want to do is find a the optimal match between the first point of each prediction and the points of each polygon
+    """
+
+    num_tgt_polygons = target['boxes'].shape[0]
+
+    # First we stack the FIRST point of the prediction polygons in a single tensor that has
+    # final shape [num_pred_polygons, 2]
+    poly = torch.stack([p[0] for p in polygons])
+
+    # We also reshape the target polygons to have x, y in a single dimension.
+    # The final shape of the tgt tensor is [num_tgt_polygons, num_points_pre_polygon(with padding), 2]
+    tgt = target['boxes'].view(num_tgt_polygons, -1, 2)
+
+    # What we w
+
+    print('poly', poly.shape)
+    print('poly', poly)
+    print('tgt', tgt.shape)
+    print('tgt', tgt)
+
+    # dist has shape [num_tgt_polygons, 7 (points per polygon with padding), num_pred_polygons]
+    dist = torch.cdist(tgt, poly, p=1)
+
+    print("dist", dist.shape)
+    print("dist", dist)
+
+    dist, _ = torch.min(dist, dim=1)
+
+    print("dist", dist.shape)
+    print("dist", dist)
+
+    indices = linear_sum_assignment(dist.cpu())
+
+    print(indices)
+
+
+
+    exit(0)
+
 
 class HungarianMatcher(nn.Module):
     """This class computes an assignment between the targets and the predictions of the network
@@ -53,7 +124,22 @@ class HungarianMatcher(nn.Module):
             For each batch element, it holds:
                 len(index_i) = len(index_j) = min(num_queries, num_target_boxes)
         """
+
         bs, num_queries = outputs["pred_logits"].shape[:2]
+
+        # First, I extract the predicted polygons from the output sequence
+        polygons = [get_polygons(log, box) for log, box in zip(outputs["pred_logits"], outputs["pred_boxes"])]
+
+        # With the prediction polygons, we can match them to the tgt polygons and create our target sequence
+        matched_sequences = [get_sequence(polygon, target) for polygon, target in zip(polygons, targets)]
+
+        exit(0)
+
+        print('outputs["pred_logits"]', outputs["pred_logits"].shape)
+        print('outputs["pred_boxes"]', outputs["pred_boxes"].shape)
+        print('[v["labels"] for v in targets]', [v["labels"] for v in targets])
+        print('[v["boxes"] for v in targets]', [v["boxes"] for v in targets])
+        exit(0)
 
         # We flatten to compute the cost matrices in a batch
         out_prob = outputs["pred_logits"].flatten(0, 1).softmax(-1)  # [batch_size * num_queries, num_classes]

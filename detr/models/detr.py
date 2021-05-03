@@ -253,10 +253,6 @@ class SetCriterion(nn.Module):
 
         outputs_without_aux = {k: v for k, v in outputs.items() if k != 'aux_outputs'}
 
-        print("pred_logits", outputs_without_aux['pred_logits'].shape)
-        print("pred_boxes", outputs_without_aux['pred_boxes'].shape)
-        exit(0)
-
         # Retrieve the matching between the outputs of the last layer and the targets
         indices = self.matcher(outputs_without_aux, targets)
 

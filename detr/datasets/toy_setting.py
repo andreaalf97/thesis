@@ -432,8 +432,8 @@ class TSDataset(torch.utils.data.Dataset):
 
         if self.transform:
             image, target = self.transform((image, target))
-            t = GetSentence(self.num_gates, self.num_corners)
-            image, target = t((image, target))
+            # t = GetSentence(self.num_gates, self.num_corners)
+            # image, target = t((image, target))
 
         return image, target
 
