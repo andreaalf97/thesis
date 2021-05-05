@@ -256,6 +256,8 @@ class SetCriterion(nn.Module):
         # Retrieve the matching between the outputs of the last layer and the targets
         class_sequence, coord_sequence = self.matcher(outputs_without_aux, targets)
 
+        masking = torch.where(class_sequence == 1, 1, 0)
+
         print(torch.where(class_sequence == 1, True, False)[:, :5])
 
         print("class_sequence")
@@ -265,7 +267,33 @@ class SetCriterion(nn.Module):
         print("coord_sequence")
         print(coord_sequence.shape)
         print(coord_sequence[:, :5, :])
+
+        cross_entropy_loss = F.cross_entropy(outputs_without_aux['pred_logits'], class_sequence, reduction='none')
+        f1_loss = F.l1_loss(outputs_without_aux['pred_boxes'], coord_sequence, reduction='none')
+        f1_loss = f1_loss * masking
+
+        print("#########")
+        print("cross_entropy_loss")
+        print(cross_entropy_loss[:, :5])
+        print("f1_loss")
+        print(f1_loss[:, :5, :])
+        print("#########")
         exit(0)
+
+        # losses = {
+        #     'loss_ce': ,
+        #     'loss_bbox':
+        # }
+
+        # loss_ce
+        # class_error
+        # loss_bbox
+        # loss_giou
+        # cardinality_error
+        # loss_ce_0
+        # loss_bbox_0
+        # loss_giou_0
+        # cardinality_error_0
 
         # Compute the average number of target boxes across all nodes, for normalization purposes
         num_boxes = sum(len(t["labels"]) for t in targets)
