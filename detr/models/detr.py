@@ -188,6 +188,14 @@ class SetCriterion(nn.Module):
         """
         assert 'pred_boxes' in outputs
 
+        print("pred_boxes")
+        print(outputs['pred_boxes'].shape)
+        print("targets")
+        print(len(targets), targets[0]['boxes'].shape)
+        print("indices")
+        print(indices)
+        exit(0)
+
         # Initialize loss as zero
         loss = torch.as_tensor(0, device=outputs['pred_boxes'].device, dtype=torch.float32)
 

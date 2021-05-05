@@ -61,35 +61,50 @@ class HungarianMatcher(nn.Module):
                 pred_boxes --> [2, 10, 8, 3]
         """
 
-        # We compute the matching for each batch
+        # We compute the matching for each batch by matching each target polygon to the first point of each prediction
         batch_indices = []
         for tgt, pred_logits, pred_boxes in zip(targets, outputs["pred_logits"], outputs["pred_boxes"]):
             tgt_boxes = tgt['boxes']
             tgt_labels = tgt['labels']
+            num_tgt_polygons = tgt_boxes.shape[0]
 
-            # Now tgt_boxes, tgt_labels, pred_logits and pred_boxes all refer to one batch only
+            distance_cost = torch.cdist(tgt_boxes.view(num_tgt_polygons, -1, 2), pred_boxes[:, 0, :2], p=1)
+            distance_cost, _ = torch.min(distance_cost, dim=1)
 
-            # We initialize the polygon-polygon cost matrix to 0
-            # it has shape [num of predictions, number of target polygons]
-            cost_matrix = torch.zeros(len(pred_logits), len(tgt_labels))
-            # We also want to maintain the point-to-point matching of the polygons so we don't compute it again
-            point_to_point_matchings = [[[] for j in range(len(tgt_labels))] for i in range(len(pred_logits))]
+            class_cost = 1 - torch.softmax(pred_logits, dim=1)[:, tgt_labels]
 
-            # For each prediction-polygon pair we compute the cost
-            for i in range(len(pred_logits)):
-                for j in range(len(tgt_labels)):
-                    cost_matrix[i, j], point_to_point_matchings[i][j] = self.get_cost(
-                        pred_logits[i], pred_boxes[i],
-                        tgt_labels[j], tgt_boxes[j],
-                        self.cost_class, self.cost_bbox
-                    )
+            total_cost = (distance_cost.permute(1, 0) * self.cost_bbox) + (class_cost * self.cost_class)
+            pred_ids, tgt_ids = linear_sum_assignment(total_cost.cpu())
 
-            # We find the bipartite matching that minimizes the cost
-            pred_indices, tgt_indices = linear_sum_assignment(cost_matrix)
+            batch_indices.append(
+                [(p, t) for p, t in zip(pred_ids, tgt_ids)]
+            )
 
-            # We return a list of tuples (index of prediction, index of target polygon) for the correct matchings
-            indices = [(p, t, point_to_point_matchings[p][t]) for p, t in zip(pred_indices, tgt_indices)]
-            batch_indices.append(indices)
+            # exit(0)
+            #
+            # # Now tgt_boxes, tgt_labels, pred_logits and pred_boxes all refer to one batch only
+            #
+            # # We initialize the polygon-polygon cost matrix to 0
+            # # it has shape [num of predictions, number of target polygons]
+            # cost_matrix = torch.zeros(len(pred_logits), len(tgt_labels))
+            # # We also want to maintain the point-to-point matching of the polygons so we don't compute it again
+            # point_to_point_matchings = [[[] for j in range(len(tgt_labels))] for i in range(len(pred_logits))]
+            #
+            # # For each prediction-polygon pair we compute the cost
+            # for i in range(len(pred_logits)):
+            #     for j in range(len(tgt_labels)):
+            #         cost_matrix[i, j], point_to_point_matchings[i][j] = self.get_cost(
+            #             pred_logits[i], pred_boxes[i],
+            #             tgt_labels[j], tgt_boxes[j],
+            #             self.cost_class, self.cost_bbox
+            #         )
+            #
+            # # We find the bipartite matching that minimizes the cost
+            # pred_indices, tgt_indices = linear_sum_assignment(cost_matrix)
+            #
+            # # We return a list of tuples (index of prediction, index of target polygon) for the correct matchings
+            # indices = [(p, t, point_to_point_matchings[p][t]) for p, t in zip(pred_indices, tgt_indices)]
+            # batch_indices.append(indices)
 
         return batch_indices
 
