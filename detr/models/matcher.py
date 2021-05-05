@@ -67,10 +67,8 @@ def get_sequence(polygons: list, target: dict, max_sequence_len: int):
         # linear_sum_assignment returns the correct target-prediction indices
         tgt_ids, pred_ids = linear_sum_assignment(dist.cpu())
 
-    print('\n'.join([f"target {t} ({tgt_poly_shapes[t]} points)was matched with prediction {p} ({len(polygons[p])} points)" for t, p in zip(tgt_ids, pred_ids)]))
-
     # Now we start creating the optimal target sequences, one for classification and one for point coordinates
-    target_sequence_class = torch.tensor([HungarianMatcher.CLASSES['<start>']], dtype=torch.float32, device=target['boxes'].device)
+    target_sequence_class = torch.tensor([HungarianMatcher.CLASSES['<start>']], dtype=torch.int64, device=target['boxes'].device)
     # Eventually we want to have a zero loss for stuff that is not classified as <point>
     target_sequence_points = torch.tensor([-1, -1], dtype=torch.float32, device=target['boxes'].device).unsqueeze(0)
     for tgt_id, pred_id in zip(tgt_ids, pred_ids):
@@ -81,7 +79,7 @@ def get_sequence(polygons: list, target: dict, max_sequence_len: int):
         target_sequence_class = torch.cat([
             target_sequence_class,
             extend_class,
-            torch.tensor([HungarianMatcher.CLASSES['<end-of-polygon>']], dtype=torch.float32,
+            torch.tensor([HungarianMatcher.CLASSES['<end-of-polygon>']], dtype=torch.int64,
                          device=extend_class.device)
         ])
 
@@ -117,7 +115,7 @@ def get_sequence(polygons: list, target: dict, max_sequence_len: int):
             target_sequence_class = torch.cat([
                 target_sequence_class,
                 extend_class,
-                torch.tensor([HungarianMatcher.CLASSES['<end-of-polygon>']], dtype=torch.float32,
+                torch.tensor([HungarianMatcher.CLASSES['<end-of-polygon>']], dtype=torch.int64,
                              device=extend_class.device)
             ])
 
@@ -133,7 +131,7 @@ def get_sequence(polygons: list, target: dict, max_sequence_len: int):
     target_sequence_class = torch.cat([
         target_sequence_class,
         torch.tensor(
-            [HungarianMatcher.CLASSES['<end-of-computation>'] for _ in range(max_sequence_len - len(target_sequence_class))], dtype=torch.float32, device=extend_class.device
+            [HungarianMatcher.CLASSES['<end-of-computation>'] for _ in range(max_sequence_len - len(target_sequence_class))], dtype=torch.int64, device=extend_class.device
         )
     ])
     target_sequence_points = torch.cat([

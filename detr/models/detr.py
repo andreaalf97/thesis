@@ -256,34 +256,33 @@ class SetCriterion(nn.Module):
         # Retrieve the matching between the outputs of the last layer and the targets
         class_sequence, coord_sequence = self.matcher(outputs_without_aux, targets)
 
-        masking = torch.where(class_sequence == 1, 1, 0)
+        masking = torch.where(class_sequence == 1, 1, 0).unsqueeze(-1).repeat(1, 1, 2)
 
-        print(torch.where(class_sequence == 1, True, False)[:, :5])
-
-        print("class_sequence")
-        print(class_sequence.shape)
-        print(class_sequence[:, :5])
-
-        print("coord_sequence")
-        print(coord_sequence.shape)
-        print(coord_sequence[:, :5, :])
-
-        cross_entropy_loss = F.cross_entropy(outputs_without_aux['pred_logits'].permute(0, 2, 1), class_sequence, reduction='none')
+        cross_entropy_loss = F.cross_entropy(outputs_without_aux['pred_logits'].permute(0, 2, 1), class_sequence, reduction='sum')
         f1_loss = F.l1_loss(outputs_without_aux['pred_boxes'], coord_sequence, reduction='none')
-        f1_loss = f1_loss * masking
+        f1_loss = (f1_loss * masking).sum()
 
-        print("#########")
-        print("cross_entropy_loss")
-        print(cross_entropy_loss[:, :5])
-        print("f1_loss")
-        print(f1_loss[:, :5, :])
-        print("#########")
-        exit(0)
+        losses = {
+            'loss_ce': cross_entropy_loss,
+            'loss_bbox': f1_loss
+        }
 
-        # losses = {
-        #     'loss_ce': ,
-        #     'loss_bbox':
-        # }
+        # In case of auxiliary losses, we repeat this process with the output of each intermediate layer.
+        if 'aux_outputs' in outputs:
+            for i, aux_outputs in enumerate(outputs['aux_outputs']):
+                class_sequence, coord_sequence = self.matcher(aux_outputs, targets)
+                masking = torch.where(class_sequence == 1, 1, 0).unsqueeze(-1).repeat(1, 1, 2)
+                cross_entropy_loss = F.cross_entropy(outputs_without_aux['pred_logits'].permute(0, 2, 1),
+                                                     class_sequence, reduction='sum')
+                f1_loss = F.l1_loss(outputs_without_aux['pred_boxes'], coord_sequence, reduction='none')
+                f1_loss = (f1_loss * masking).sum()
+                new_losses = {
+                    'loss_ce' + f'_{i}': cross_entropy_loss,
+                    'loss_bbox' + f'_{i}': f1_loss
+                }
+                losses.update(new_losses)
+
+        return losses
 
         # loss_ce
         # class_error
