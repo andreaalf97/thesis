@@ -268,7 +268,7 @@ class SetCriterion(nn.Module):
         print(coord_sequence.shape)
         print(coord_sequence[:, :5, :])
 
-        cross_entropy_loss = F.cross_entropy(outputs_without_aux['pred_logits'], class_sequence, reduction='none')
+        cross_entropy_loss = F.cross_entropy(outputs_without_aux['pred_logits'].permute(0, 2, 1), class_sequence, reduction='none')
         f1_loss = F.l1_loss(outputs_without_aux['pred_boxes'], coord_sequence, reduction='none')
         f1_loss = f1_loss * masking
 
