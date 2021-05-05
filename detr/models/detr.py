@@ -254,7 +254,18 @@ class SetCriterion(nn.Module):
         outputs_without_aux = {k: v for k, v in outputs.items() if k != 'aux_outputs'}
 
         # Retrieve the matching between the outputs of the last layer and the targets
-        indices = self.matcher(outputs_without_aux, targets)
+        class_sequence, coord_sequence = self.matcher(outputs_without_aux, targets)
+
+        print(torch.where(class_sequence == 1, True, False)[:, :5])
+
+        print("class_sequence")
+        print(class_sequence.shape)
+        print(class_sequence[:, :5])
+
+        print("coord_sequence")
+        print(coord_sequence.shape)
+        print(coord_sequence[:, :5, :])
+        exit(0)
 
         # Compute the average number of target boxes across all nodes, for normalization purposes
         num_boxes = sum(len(t["labels"]) for t in targets)

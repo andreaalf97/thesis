@@ -8,13 +8,6 @@ from torch import nn
 
 from util.box_ops import box_cxcywh_to_xyxy, generalized_box_iou
 
-CLASSES = {
-    0: "<start>",
-    1: "<point>",
-    2: "<end-of-polygon>",
-    3: "<end-of-computation>"
-}
-
 
 @torch.no_grad()
 def get_polygons(logits_full: torch.Tensor, boxes: torch.Tensor) -> list:
@@ -36,8 +29,9 @@ def get_polygons(logits_full: torch.Tensor, boxes: torch.Tensor) -> list:
 
 
 @torch.no_grad()
-def get_sequence(polygons: list, target: dict):
+def get_sequence(polygons: list, target: dict, max_sequence_len: int):
     """
+    This is repeated for each batch
         This function takes the list of prediction polygons and the list of ground truth polygons of the same batch
         and outputs the optimal target sequence after matching them.
         What we want to do is find a the optimal match between the first point of each prediction and the points of each polygon
@@ -45,39 +39,109 @@ def get_sequence(polygons: list, target: dict):
 
     num_tgt_polygons = target['boxes'].shape[0]
 
-    # First we stack the FIRST point of the prediction polygons in a single tensor that has
-    # final shape [num_pred_polygons, 2]
-    poly = torch.stack([p[0] for p in polygons])
+    # tgt_poly_shapes is basically a list of the number of points of each polygon in the image
+    tgt_poly_shapes = target['poly_shapes']
 
     # We also reshape the target polygons to have x, y in a single dimension.
-    # The final shape of the tgt tensor is [num_tgt_polygons, num_points_pre_polygon(with padding), 2]
+    # The final shape of the tgt tensor is [num_tgt_polygons, num_points_per_polygon(with padding), 2]
     tgt = target['boxes'].view(num_tgt_polygons, -1, 2)
 
-    # What we w
+    if len(polygons) < 1:
+        tgt_ids, pred_ids = [], []
+    else:
+        # First we stack the FIRST point of the prediction polygons in a single tensor that has
+        # final shape [num_pred_polygons, 2]
+        first_point_poly = torch.stack([p[0] for p in polygons])
 
-    print('poly', poly.shape)
-    print('poly', poly)
-    print('tgt', tgt.shape)
-    print('tgt', tgt)
+        # What we want is to compute the cost matrix (p2 distance) between all first points of the prediction polygons
+        # and all the points of the target polygons in a single operation
 
-    # dist has shape [num_tgt_polygons, 7 (points per polygon with padding), num_pred_polygons]
-    dist = torch.cdist(tgt, poly, p=1)
+        # dist has shape [num_tgt_polygons, 7 (points per polygon with padding), num_pred_polygons] and
+        # contains the p2 distances
+        dist = torch.cdist(tgt, first_point_poly, p=2)
 
-    print("dist", dist.shape)
-    print("dist", dist)
+        # We find, for each prediction-target pair, the closest point. This distance is the cost of this pair
+        # dist has shape [num_target_polygons, num_pred_polygons]
+        dist, _ = torch.min(dist, dim=1)
 
-    dist, _ = torch.min(dist, dim=1)
+        # linear_sum_assignment returns the correct target-prediction indices
+        tgt_ids, pred_ids = linear_sum_assignment(dist.cpu())
 
-    print("dist", dist.shape)
-    print("dist", dist)
+    print('\n'.join([f"target {t} ({tgt_poly_shapes[t]} points)was matched with prediction {p} ({len(polygons[p])} points)" for t, p in zip(tgt_ids, pred_ids)]))
 
-    indices = linear_sum_assignment(dist.cpu())
+    # Now we start creating the optimal target sequences, one for classification and one for point coordinates
+    target_sequence_class = torch.tensor([HungarianMatcher.CLASSES['<start>']], dtype=torch.float32, device=target['boxes'].device)
+    # Eventually we want to have a zero loss for stuff that is not classified as <point>
+    target_sequence_points = torch.tensor([-1, -1], dtype=torch.float32, device=target['boxes'].device).unsqueeze(0)
+    for tgt_id, pred_id in zip(tgt_ids, pred_ids):
+        num_tgt_points = tgt_poly_shapes[tgt_id]
 
-    print(indices)
+        extend_class = torch.tensor([HungarianMatcher.CLASSES['<point>'] for _ in range(num_tgt_points)],
+                                    device=target_sequence_class.device)
+        target_sequence_class = torch.cat([
+            target_sequence_class,
+            extend_class,
+            torch.tensor([HungarianMatcher.CLASSES['<end-of-polygon>']], dtype=torch.float32,
+                         device=extend_class.device)
+        ])
 
+        # If the prediction has a different amount of points from the ground truth, we compute the loss with a
+        # random permutation of the target points
+        if len(polygons[pred_id]) != num_tgt_points:
+            perm = torch.randperm(num_tgt_points)
 
+            target_sequence_points = torch.cat([
+                target_sequence_points,
+                tgt[tgt_id][:num_tgt_points][perm],
+                torch.tensor([-1, -1], dtype=torch.float32, device=target_sequence_points.device).unsqueeze(0)
+            ])
+        # Otherwise, we let the architecture output the points in the order it prefers
+        else:
+            point_to_point_cost = torch.cdist(tgt[tgt_id][:num_tgt_points], polygons[pred_id], p=2)
+            tgt_points_ids, pred_points_ids = linear_sum_assignment(point_to_point_cost.cpu())
 
-    exit(0)
+            target_sequence_points = torch.cat([
+                target_sequence_points,
+                tgt[tgt_id][:num_tgt_points][pred_points_ids],
+                torch.tensor([-1, -1], dtype=torch.float32, device=target_sequence_points.device).unsqueeze(0)
+            ])
+
+    # We now need to add to the sequence the polygons that were not predicted by the model
+    # Again, we add the polygons with a random permutation of the points
+    for i in range(num_tgt_polygons):
+        if i not in tgt_ids:
+            num_tgt_points = tgt_poly_shapes[i]
+
+            extend_class = torch.tensor([HungarianMatcher.CLASSES['<point>'] for _ in range(num_tgt_points)],
+                                        device=target_sequence_class.device)
+            target_sequence_class = torch.cat([
+                target_sequence_class,
+                extend_class,
+                torch.tensor([HungarianMatcher.CLASSES['<end-of-polygon>']], dtype=torch.float32,
+                             device=extend_class.device)
+            ])
+
+            perm = torch.randperm(num_tgt_points)
+
+            target_sequence_points = torch.cat([
+                target_sequence_points,
+                tgt[i][:num_tgt_points][perm],
+                torch.tensor([-1, -1], dtype=torch.float32, device=target_sequence_points.device).unsqueeze(0)
+            ])
+
+    # Finally, we close the sequence
+    target_sequence_class = torch.cat([
+        target_sequence_class,
+        torch.tensor(
+            [HungarianMatcher.CLASSES['<end-of-computation>'] for _ in range(max_sequence_len - len(target_sequence_class))], dtype=torch.float32, device=extend_class.device
+        )
+    ])
+    target_sequence_points = torch.cat([
+        target_sequence_points,
+        torch.tensor([[-1, -1] for _ in range(max_sequence_len - len(target_sequence_points))], dtype=torch.float32, device=target_sequence_points.device).view(-1, 2)
+    ])
+
+    return target_sequence_class, target_sequence_points
 
 
 class HungarianMatcher(nn.Module):
@@ -87,6 +151,13 @@ class HungarianMatcher(nn.Module):
     there are more predictions than targets. In this case, we do a 1-to-1 matching of the best predictions,
     while the others are un-matched (and thus treated as non-objects).
     """
+
+    CLASSES = {
+        "<start>": 0,
+        "<point>": 1,
+        "<end-of-polygon>": 2,
+        "<end-of-computation>": 3
+    }
 
     def __init__(self, cost_class: float = 1, cost_bbox: float = 1, cost_giou: float = 1):
         """Creates the matcher
@@ -130,8 +201,18 @@ class HungarianMatcher(nn.Module):
         # First, I extract the predicted polygons from the output sequence
         polygons = [get_polygons(log, box) for log, box in zip(outputs["pred_logits"], outputs["pred_boxes"])]
 
-        # With the prediction polygons, we can match them to the tgt polygons and create our target sequence
-        matched_sequences = [get_sequence(polygon, target) for polygon, target in zip(polygons, targets)]
+        class_seq = []
+        coord_seq = []
+        for polygon, target in zip(polygons, targets):
+            # With the prediction polygons, we can match them to the tgt polygons and create our target sequence
+            cl, coord = get_sequence(polygon, target, num_queries)
+            class_seq.append(cl)
+            coord_seq.append(coord)
+
+        class_seq = torch.stack(class_seq)
+        coord_seq = torch.stack(coord_seq)
+
+        return class_seq, coord_seq
 
         exit(0)
 

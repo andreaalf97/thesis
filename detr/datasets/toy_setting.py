@@ -111,6 +111,7 @@ def get_ts_image(height, width, num_gates=3, no_gate_chance=0.10, black_and_whit
     labels = []
     areas = []
     classes = []
+    polygon_shapes = []
 
     for _ in range(num_gates):
         if black_and_white:
@@ -126,8 +127,9 @@ def get_ts_image(height, width, num_gates=3, no_gate_chance=0.10, black_and_whit
         areas.append(gate.get_area())
         classes.append(gate.get_class())
         img = print_polygate(img, gate)
+        polygon_shapes.append(len(gate.corners))
 
-    return img, labels, areas, classes
+    return img, labels, areas, classes, polygon_shapes
 
 
 def print_polygate(img: np.ndarray, gate: PolyGate) -> np.ndarray:
@@ -408,7 +410,7 @@ class TSDataset(torch.utils.data.Dataset):
         return 10000
 
     def __getitem__(self, index):
-        image, labels, areas, classes = get_ts_image(
+        image, labels, areas, classes, polygon_shapes = get_ts_image(
             self.img_height,
             self.img_width,
             num_gates=self.num_gates,
@@ -428,6 +430,7 @@ class TSDataset(torch.utils.data.Dataset):
             'iscrowd': torch.tensor([0 for _ in range(len(labels))], dtype=torch.int64),
             'orig_size': torch.tensor([self.img_height, self.img_width], dtype=torch.int64),
             'size': torch.tensor([self.img_height, self.img_width], dtype=torch.int64),
+            'poly_shapes': torch.tensor(polygon_shapes, dtype=torch.int64)
         }
 
         if self.transform:
@@ -444,8 +447,9 @@ if __name__ == '__main__':
 
     for image, target in ds:
         plt.imshow(image.cpu().permute(1, 2, 0))
+        print(target['poly_shapes'])
 
-        print('\n'.join(str(k) + ' --> ' + str(list(target[k].shape)) for k in target))
+        # print('\n'.join(str(k) + ' --> ' + str(list(target[k].shape)) for k in target))
 
         plt.show()
 
