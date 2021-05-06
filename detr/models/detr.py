@@ -5,6 +5,7 @@ DETR model and criterion classes.
 import torch
 import torch.nn.functional as F
 from torch import nn
+from scipy.optimize import linear_sum_assignment
 
 from util import box_ops
 from util.misc import (NestedTensor, nested_tensor_from_tensor_list,
@@ -127,7 +128,7 @@ class SetCriterion(nn.Module):
         assert 'pred_logits' in outputs
 
         # From the matching tensor we remove the indices of the point-to-point matching
-        match = [torch.tensor([[m[0], m[1]] for m in batch], dtype=torch.int64) for batch in indices]
+        match = [torch.tensor(batch, dtype=torch.int64) for batch in indices]
 
         # We create the target tensor by looking at the matching indices
         class_tgt = torch.full(
@@ -188,37 +189,54 @@ class SetCriterion(nn.Module):
         """
         assert 'pred_boxes' in outputs
 
-        print("pred_boxes")
-        print(outputs['pred_boxes'].shape)
-        print("targets")
-        print(len(targets), targets[0]['boxes'].shape)
-        print("indices")
-        print(indices)
-        exit(0)
+        '''
+            This function first builds a large target tensor of same shape as the prediction and then computes the loss
+        '''
 
-        # Initialize loss as zero
-        loss = torch.as_tensor(0, device=outputs['pred_boxes'].device, dtype=torch.float32)
+        # Initialize loss tensor, which will be filled manually
+        final_target = torch.zeros(size=outputs['pred_boxes'].shape, device=outputs['pred_boxes'].device, dtype=torch.float32)
+        final_target_mask = torch.zeros(size=outputs['pred_boxes'].shape, device=outputs['pred_boxes'].device, dtype=torch.float32)
 
-        # For each batch
-        for pred_boxes, target, index in zip(outputs['pred_boxes'], targets, indices):
-            tgt_boxes = target['boxes']
-            # We reshape the target to have each point in a row
-            tgt_boxes = tgt_boxes.view(tgt_boxes.shape[0], -1, 2)
+        with torch.no_grad():
+            # For each batch
+            for batch_i, (pred_boxes, target, index) in enumerate(zip(outputs['pred_boxes'], targets, indices)):
+                tgt_boxes = target['boxes']
+                # We reshape the target to have each point in a row
+                tgt_boxes = tgt_boxes.view(tgt_boxes.shape[0], -1, 2)
 
-            for match in index:
-                # For each object query, we compute the loss by matching point to point
-                p, t, corners_matching = match
-                corners_matching = [x[1] for x in corners_matching]
-                tgt = tgt_boxes[t, corners_matching]
-                tgt = torch.cat([tgt, torch.zeros(tgt.shape[0], 1).to(tgt.device)], dim=1)
-                padding = torch.zeros(pred_boxes[p].shape[0] - tgt.shape[0], 3).to(tgt.device)
-                padding[:, 2] = 1
-                padding[:, :2] = pred_boxes[p, -len(padding):, :2]
-                tgt = torch.cat([tgt, padding], dim=0)
+                # We also count how many points each target polygon has
+                valid_points = torch.where(tgt_boxes > -0.5, True, False)
+                valid_points = valid_points[:, :, 0] & valid_points[:, :, 1]
+                valid_points = valid_points.sum(dim=1)  # valid_points is a list of shape [# of polygons in this batch]
 
-                loss += F.l1_loss(pred_boxes[p], tgt, reduction='sum')
+                # For each prediction-target polygon match
+                for match in index:
+                    # For each object query, we compute the loss by matching point to point
+                    p, t = match
 
-        losses = {'loss_bbox': loss / num_boxes}
+                    # We compute the point to point distance of all points of the two polygons and match them
+                    point_dist = torch.cdist(pred_boxes[p, :valid_points[t], :2], tgt_boxes[t, :valid_points[t]], p=1)
+                    _, tgt_ids = linear_sum_assignment(point_dist.cpu())
+
+                    final_target[batch_i, p, :valid_points[t], :2] = tgt_boxes[t, tgt_ids, :]
+                    final_target_mask[batch_i, p, :valid_points[t], :] = 1
+                    # This next line is not necessary if we initialize the final target tensor to 0
+                    # final_target[batch_i, p, :valid_points[t], -1] = 0
+                    final_target[batch_i, p, valid_points[t]:, -1] = 1
+                    final_target_mask[batch_i, p, valid_points[t]:, -1] = 1
+                    #
+                    # tgt = tgt_boxes[t]
+                    # tgt = torch.cat([tgt, torch.zeros(tgt.shape[0], 1).to(tgt.device)], dim=1)
+                    # padding = torch.zeros(pred_boxes[p].shape[0] - tgt.shape[0], 3).to(tgt.device)
+                    # padding[:, 2] = 1
+                    # padding[:, :2] = pred_boxes[p, -len(padding):, :2]
+                    # tgt = torch.cat([tgt, padding], dim=0)
+                    #
+                    # loss += F.l1_loss(pred_boxes[p], tgt, reduction='sum')
+
+        loss = F.l1_loss(outputs['pred_boxes'], final_target, reduction='none')
+        loss = loss * final_target_mask
+        losses = {'loss_bbox': loss.sum() / num_boxes}
         return losses
 
         idx = self._get_src_permutation_idx(indices)
