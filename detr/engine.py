@@ -259,7 +259,7 @@ def plot_prediction(samples: utils.NestedTensor, outputs: dict, targets: tuple):
             if torch.argmax(logit) == 0:
                 num_pred += 1
                 i, x, y = 0, [], []
-                while i < len(points) and points[i][2] > 0:
+                while i < len(points) and points[i][2] < 0.5:
                     x.append(points[i][0].cpu().item()*256)
                     y.append(points[i][1].cpu().item()*256)
                     i += 1
