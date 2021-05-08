@@ -87,12 +87,15 @@ def get_args_parser():
     parser.add_argument('--coco_panoptic_path', type=str)
     parser.add_argument('--remove_difficult', action='store_true')
 
-    # Args for REAL GATE Dataset
+    # Args for REAL GATE and CROWDAI Dataset
     parser.add_argument('--real_gate_path', type=str,
                         default="/home/andreaalf/Documents/thesis/datasets/gate_samples"
                         )
-    parser.add_argument('--real_gate_pickle_path', type=str, default="/home/andreaalf/Documents/thesis/datasets/STD_TRAIN_daylight15k_irosFrontal.pkl")
-
+    parser.add_argument('--crowdai_path', type=str,
+                        default=""
+                        )
+    parser.add_argument('--real_gate_pickle_path', type=str,
+                        default="/home/andreaalf/Documents/thesis/datasets/STD_TRAIN_daylight15k_irosFrontal.pkl")
 
     parser.add_argument('--output_dir', default='',
                         help='path where to save, empty for no saving')  # default 'checkpoints'
