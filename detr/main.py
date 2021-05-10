@@ -83,6 +83,7 @@ def get_args_parser():
     # dataset parameters
     parser.add_argument('--dataset_file', default='toy_setting')  # 'toy_setting' for generated images, 'real_gates' otherwise
     parser.add_argument('--colored', action='store_true')  # To train or test on colored images
+    parser.add_argument('--random_ordered_seq', action='store_true')  # To train or test on colored images
     parser.add_argument('--coco_path', type=str, default="")  # /home/andreaalf/Documents/detr/coco_dataset
     parser.add_argument('--coco_panoptic_path', type=str)
     parser.add_argument('--remove_difficult', action='store_true')
