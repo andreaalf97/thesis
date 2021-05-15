@@ -11,9 +11,8 @@ import matplotlib.pyplot as plt
 
 CLASSES = {
     "<start>": 0,
-    "<point>": 1,
-    "<end-of-polygon>": 2,
-    "<end-of-computation>": 3
+    "<polygon>": 1,
+    "<end-of-computation>": 2
 }
 
 class PolyGate:
@@ -273,9 +272,10 @@ class GetSentence(object):
     def __call__(self, sample):
         img, target = sample
 
-        max_lenght = (self.num_gates * (self.num_corners+1)) + 2
+        max_lenght = self.num_gates + 2
 
         if self.random_order:
+            raise Exception("Not ready for random ordering of polygons")
             num_polygons = target['boxes'].shape[0]
 
             perm = torch.randperm(num_polygons)
@@ -304,19 +304,19 @@ class GetSentence(object):
         else:
             centers = []
             for polygon in target['boxes']:
-                index = len(polygon)
-                for i, value in enumerate(polygon):
-                    if value == -1:
-                        index = i
-                        break
-                mean_x = polygon[:index:2].mean().item()
-                mean_y = polygon[1:index:2].mean().item()
+                # index = len(polygon)
+                # for i, value in enumerate(polygon):
+                #     if value == -1:
+                #         index = i
+                #         break
+                mean_x = polygon[::2].mean().item()
+                mean_y = polygon[1::2].mean().item()
                 centers.append((mean_x, mean_y))
             centers = {i: c for i, c in enumerate(centers)}
 
             sequence = []
             start_token = torch.zeros(256)
-            start_token[2 + CLASSES['<start>']] = 1
+            start_token[8 + CLASSES['<start>']] = 1
             sequence.append(start_token)
 
             while len(centers) > 0:
@@ -331,23 +331,16 @@ class GetSentence(object):
                         min_index = index
 
                 polygon = target['boxes'][min_index]
-                for x, y in polygon.view(-1, 2):
-                    if x == -1:
-                        break
-                    token = torch.zeros(256)
-                    token[2 + CLASSES['<point>']] = 1
-                    token[0] = x
-                    token[1] = y
-                    sequence.append(token)
-                end_polygon = torch.zeros(256)
-                end_polygon[2 + CLASSES['<end-of-polygon>']] = 1
-                sequence.append(end_polygon)
+                token = torch.zeros(256)
+                token[8 + CLASSES['<polygon>']] = 1
+                token[:8] = polygon
+                sequence.append(token)
 
                 centers.pop(min_index)
 
         while len(sequence) < max_lenght:
             end_computation = torch.zeros(256)
-            end_computation[2 + CLASSES['<end-of-computation>']] = 1
+            end_computation[8 + CLASSES['<end-of-computation>']] = 1
             sequence.append(end_computation)
 
         sequence = torch.stack(sequence)
@@ -469,7 +462,7 @@ class TSDataset(torch.utils.data.Dataset):
 
 if __name__ == '__main__':
 
-    ds = TSDataset(256, 256, num_gates=5, black_and_white=True, no_gate_chance=0.0, stroke=-1, num_corners=-1, mask=False, clamp_gates=True, random_order=True)
+    ds = TSDataset(256, 256, num_gates=5, black_and_white=True, no_gate_chance=0.0, stroke=-1, num_corners=4, mask=False, clamp_gates=True, random_order=False)
 
     start = 0
     point = 0
@@ -485,21 +478,19 @@ if __name__ == '__main__':
         plt.imshow(image.permute(1, 2, 0))
 
         sequence = target['sequence']
+        print(sequence[:, :11])
 
-        x, y = [], []
         for element in sequence[1:]:
-            if torch.argmax(element[2:6]) == 1:
-                x.append(element[0] * 256)
-                y.append(element[1] * 256)
-            else:
-                if len(x) > 0:
-                    for i, (p_x, p_y) in enumerate(zip(x, y)):
-                        plt.scatter([p_x], [p_y], label=i)
-                    plt.legend()
-                    plt.show()
-                    break
-                x, y = [], []
+            if element[8 + CLASSES['<end-of-computation>']] == 1:
+                break
+            x = element[:8:2] * 256
+            y = element[1:8:2] * 256
 
+            for i, (a, b) in enumerate(zip(x, y)):
+                plt.scatter(a.cpu(), b.cpu(), label=i)
+            break
+
+        plt.legend()
         plt.show()
 
         break
