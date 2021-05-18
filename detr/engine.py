@@ -264,8 +264,8 @@ def plot_image_with_labels(samples: torch.Tensor, targets: torch.Tensor, num_sam
 @torch.no_grad()
 def plot_prediction(samples: utils.NestedTensor, outputs: torch.Tensor, targets: tuple):
 
-    classes_batch = torch.argmax(outputs[:, :, 2:6], dim=2)  # [batch_size, seq_len]
-    coords_batch = outputs[:, :, :2]  # [batch_size, seq_len, 2]
+    classes_batch = torch.argmax(outputs[:, :, 8:11], dim=2)  # [batch_size, seq_len]
+    coords_batch = outputs[:, :, :8]  # [batch_size, seq_len, 2]
 
     colors = [
         "tab:blue",
@@ -300,16 +300,7 @@ def plot_prediction(samples: utils.NestedTensor, outputs: torch.Tensor, targets:
         poly = []
         for cl, xy in zip(class_seq, coords_seq):
             if cl == 1:
-                poly.append(xy)
-            else:
-                if len(poly) > 0:
-                    poly = torch.stack(poly).cpu()
-                    plt.scatter(
-                        poly[:, 0]*w,
-                        poly[:, 1] * h,
-                    )
-                    pass
-                poly = []
+                plt.scatter(xy[::2].cpu() * w, xy[1::2].cpu() * h)
 
 
         # for logit, coord, color in zip(logits, coords, colors):
