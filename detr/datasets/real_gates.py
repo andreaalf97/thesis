@@ -8,6 +8,12 @@ import random
 import pandas as pd
 
 
+CLASSES = {
+    '<start>': 0,
+    '<polygon>': 1,
+    '<end-of-computation>': 2
+}
+
 class ToTensor(object):
     def __init__(self):
         self.transform = T.ToTensor()
@@ -224,6 +230,57 @@ class Hue(object):
         return img, target
 
 
+class GetSentence(object):
+    def __init__(self, max_gates=4):
+        self.max_gates = max_gates
+
+    def __call__(self, sample):
+        img, target = sample
+
+        max_lenght = self.max_gates + 2
+
+        centers = []
+        for polygon in target['boxes']:
+            mean_x = polygon[::2].mean().item()
+            mean_y = polygon[1::2].mean().item()
+            centers.append((mean_x, mean_y))
+        centers = {i: c for i, c in enumerate(centers)}
+
+        sequence = []
+        start_token = torch.zeros(256)
+        start_token[8 + CLASSES['<start>']] = 1
+        sequence.append(start_token)
+
+        while len(centers) > 0:
+            min_center = [2, 2]
+            for index in centers:
+                x, y = centers[index]
+                if y < min_center[1]:
+                    min_center = (x, y)
+                    min_index = index
+                elif y == min_center[1] and x < min_center[0]:
+                    min_center = (x, y)
+                    min_index = index
+
+            polygon = target['boxes'][min_index]
+            token = torch.zeros(256)
+            token[8 + CLASSES['<polygon>']] = 1
+            token[:8] = polygon
+            sequence.append(token)
+
+            centers.pop(min_index)
+
+        while len(sequence) < max_lenght:
+            end_computation = torch.zeros(256)
+            end_computation[8 + CLASSES['<end-of-computation>']] = 1
+            sequence.append(end_computation)
+
+        sequence = torch.stack(sequence)
+
+        target['sequence'] = sequence
+        return img, target
+
+
 def order_y(points: list):
     assert len(points) == 2 and isinstance(points[0], tuple)
 
@@ -318,10 +375,11 @@ class RealGatesDS(torch.utils.data.Dataset):
         Hue(prob=0.1),
         RandomHorizontalFlip(prob=0.4),
         RandomVerticalFlip(prob=0.4),
-        AddGaussianNoise(prob=0.1)
+        AddGaussianNoise(prob=0.1),
+        GetSentence()
     ])
 
-    val_transform = T.Compose([ToTensor()])
+    val_transform = T.Compose([ToTensor(), GetSentence()])
 
     folder_codes = {
         "basement_course1": 0,
@@ -368,6 +426,7 @@ class RealGatesDS(torch.utils.data.Dataset):
                 self.df = self.df.append(tmp_df, ignore_index=True)
 
         self.df = self.df[self.df['split'] == image_set]
+        self.max_gates = self.df['num_gates'].max()
         print(f"[RG DATASET] Loaded {len(self.df)} images for {image_set} split")
 
     def __len__(self):
