@@ -57,7 +57,7 @@ def get_args_parser():
     parser.add_argument('--num_queries', default=26, type=int,
                         help="Number of query slots")
     parser.add_argument('--pre_norm', action='store_true')
-    parser.add_argument('--no_pos_decoder', action='store_true')
+    parser.add_argument('--no_pos_decoder', action='store_true')  # This removes the positional encodings from the decoder sequence
 
     # * Segmentation
     parser.add_argument('--masks', action='store_true',
@@ -84,11 +84,12 @@ def get_args_parser():
     # dataset parameters
     parser.add_argument('--dataset_file', default='toy_setting')  # 'toy_setting' for generated images, 'real_gates' otherwise
     parser.add_argument('--colored', action='store_true')  # To train or test on colored images
-    parser.add_argument('--random_ordered_seq', action='store_true')  # To train or test on colored images
     parser.add_argument('--coco_path', type=str, default="")  # /home/andreaalf/Documents/detr/coco_dataset
     parser.add_argument('--coco_panoptic_path', type=str)
     parser.add_argument('--remove_difficult', action='store_true')
     parser.add_argument('--num_gates', default=4, type=int)
+    parser.add_argument('--seq_order', default='tb', type=str, choices=('tb', 'bt', 'ls', 'sl', 'lr', 'rl', 'random'),
+                        help="Order of the polygons within the sequence")
 
     # Args for REAL GATE Dataset
     parser.add_argument('--real_gate_path', type=str,

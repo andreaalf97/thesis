@@ -231,44 +231,59 @@ class Hue(object):
 
 
 class GetSentence(object):
-    def __init__(self, max_gates=4):
+    def __init__(self, seq_order, max_gates=4):
         self.max_gates = max_gates
+        self.seq_order = seq_order
 
     def __call__(self, sample):
         img, target = sample
 
         max_lenght = self.max_gates + 2
 
-        centers = []
-        for polygon in target['boxes']:
-            mean_x = polygon[::2].mean().item()
-            mean_y = polygon[1::2].mean().item()
-            centers.append((mean_x, mean_y))
-        centers = {i: c for i, c in enumerate(centers)}
-
         sequence = []
         start_token = torch.zeros(256)
         start_token[8 + CLASSES['<start>']] = 1
         sequence.append(start_token)
 
-        while len(centers) > 0:
-            min_center = [2, 2]
-            for index in centers:
-                x, y = centers[index]
-                if y < min_center[1]:
-                    min_center = (x, y)
-                    min_index = index
-                elif y == min_center[1] and x < min_center[0]:
-                    min_center = (x, y)
-                    min_index = index
+        if self.seq_order in ('lr', 'rl'):
+            centers = []
+            for polygon in target['boxes']:
+                mean_x = polygon[::2].mean().item()
+                mean_y = polygon[1::2].mean().item()
+                centers.append((mean_x, mean_y))
+            centers = {i: c for i, c in enumerate(centers)}
 
-            polygon = target['boxes'][min_index]
-            token = torch.zeros(256)
-            token[8 + CLASSES['<polygon>']] = 1
-            token[:8] = polygon
-            sequence.append(token)
+            if 'lr' in self.seq_order:
+                centers = sorted(centers.items(), key=lambda x: x[1][0])
+            else:
+                centers = sorted(centers.items(), key=lambda x: x[1][0], reverse=True)
 
-            centers.pop(min_index)
+            for i, center in centers:
+                polygon = target['boxes'][i]
+                token = torch.zeros(256)
+                token[8 + CLASSES['<polygon>']] = 1
+                token[:8] = polygon
+                sequence.append(token)
+        elif self.seq_order in ('ls', 'sl'):
+            areas = {i: c.item() for i, c in enumerate(target['area'])}
+
+            print(areas)
+            print(areas.items())
+            print(
+                sorted(areas.items(), key=lambda x: x[1])
+            )
+
+            if 'ls' in self.seq_order:
+                areas = sorted(areas.items(), key=lambda x: x[1], reverse=True)
+            else:
+                areas = sorted(areas.items(), key=lambda x: x[1], reverse=False)
+
+            for element in areas:
+                polygon = target['boxes'][element[0]]
+                token = torch.zeros(256)
+                token[8 + CLASSES['<polygon>']] = 1
+                token[:8] = polygon
+                sequence.append(token)
 
         while len(sequence) < max_lenght:
             end_computation = torch.zeros(256)
@@ -369,18 +384,6 @@ def reorder(target):
 
 class RealGatesDS(torch.utils.data.Dataset):
 
-    std_transforms = T.Compose([
-        ToTensor(),
-        # Resize((256, 256)),
-        Hue(prob=0.1),
-        RandomHorizontalFlip(prob=0.4),
-        RandomVerticalFlip(prob=0.4),
-        AddGaussianNoise(prob=0.1),
-        GetSentence()
-    ])
-
-    val_transform = T.Compose([ToTensor(), GetSentence()])
-
     folder_codes = {
         "basement_course1": 0,
         "basement_course3": 1,
@@ -402,15 +405,30 @@ class RealGatesDS(torch.utils.data.Dataset):
         "random_flight": 17
     }
 
-    def __init__(self, dataset_path, pkl_path, image_set='train', transform=None, mask_rcnn=False):
+    def __init__(self, dataset_path, pkl_path, image_set='train', transform=None, mask_rcnn=False, seq_order='tb'):
         assert isinstance(dataset_path, str)
         assert isinstance(pkl_path, (str, list))
         assert image_set in ('train', 'val')
+        assert seq_order in ('ls', 'sl', 'lr', 'rl', 'random'), f"{seq_order} order not implemented for REAL GATES"
+
+        self.std_transforms = T.Compose([
+            ToTensor(),
+            # Resize((256, 256)),
+            Hue(prob=0.1),
+            RandomHorizontalFlip(prob=0.4),
+            RandomVerticalFlip(prob=0.4),
+            AddGaussianNoise(prob=0.1),
+            GetSentence(seq_order)
+        ])
+
+        self.val_transform = T.Compose([ToTensor(), GetSentence(seq_order)])
 
         print("[RG DATASET] Initializing Real Gates dataset")
+        print(f"[RG DATASET] Sequence ordering will be: {seq_order}")
         self.dataset_path = dataset_path
         self.transform = transform if transform is not None else self.std_transforms
         self.mask_rcnn = mask_rcnn
+        self.seq_order = seq_order
 
         if 'val' in image_set:
             image_set = 'test'
@@ -516,7 +534,8 @@ if __name__ == '__main__':
         "/home/andreaalf/Documents/thesis/datasets/gate_samples",
         "/home/andreaalf/Documents/thesis/datasets/STD_TRAIN_daylight15k_irosFrontal.pkl",
         mask_rcnn=False,
-        image_set='val'
+        image_set='train',
+        seq_order='rl'
     )
 
     index = random.choice(range(len(ds)))
@@ -525,17 +544,23 @@ if __name__ == '__main__':
 
     plt.imshow(img.cpu().permute(1, 2, 0))
     h, w = target['size']
-    bnd_box = target['boxes']
+    sequence = target['sequence']
     # gates = target['gates']
     # masks = target['masks']
-    for box in bnd_box:
+    for i, element in enumerate(sequence):
+        if element[9] == 1:
+            plt.scatter(
+                element[:8:2].cpu() * w,
+                element[1:8:2].cpu() * h,
+                label=i
+            )
         # plt.scatter([box[0], box[2]], [box[1], box[3]])
         # plt.scatter([box[2]*w, box[4]*w, box[6]*w], [box[3]*h, box[5]*h, box[7]*h])
         # plt.scatter([box[0]*w], [box[1]*h])
-        plt.scatter([box[0]*w], [box[1]*h], label='0')
-        plt.scatter([box[2]*w], [box[3]*h], label='1')
-        plt.scatter([box[4]*w], [box[5]*h], label='2')
-        plt.scatter([box[6]*w], [box[7]*h], label='3')
+        # plt.scatter([box[0]*w], [box[1]*h], label='0')
+        # plt.scatter([box[2]*w], [box[3]*h], label='1')
+        # plt.scatter([box[4]*w], [box[5]*h], label='2')
+        # plt.scatter([box[6]*w], [box[7]*h], label='3')
 
     plt.legend()
     plt.title(target['image_id'].item())
