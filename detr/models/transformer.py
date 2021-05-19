@@ -20,7 +20,7 @@ class Transformer(nn.Module):
     def __init__(self, d_model=512, nhead=8, num_encoder_layers=6,
                  num_decoder_layers=6, dim_feedforward=2048, dropout=0.1,
                  activation="relu", normalize_before=False,
-                 return_intermediate_dec=False):
+                 return_intermediate_dec=False, no_pos_decoder=False):
         super().__init__()
 
         encoder_layer = TransformerEncoderLayer(d_model, nhead, dim_feedforward,
@@ -32,7 +32,7 @@ class Transformer(nn.Module):
                                                 dropout, activation, normalize_before)
         decoder_norm = nn.LayerNorm(d_model)
         self.decoder = TransformerDecoder(decoder_layer, num_decoder_layers, decoder_norm,
-                                          return_intermediate=return_intermediate_dec)
+                                          return_intermediate=return_intermediate_dec, no_pos=no_pos_decoder)
 
         self._reset_parameters()
 
@@ -99,12 +99,13 @@ class TransformerEncoder(nn.Module):
 
 class TransformerDecoder(nn.Module):
 
-    def __init__(self, decoder_layer, num_layers, norm=None, return_intermediate=False):
+    def __init__(self, decoder_layer, num_layers, norm=None, return_intermediate=False, no_pos=False):
         super().__init__()
         self.layers = _get_clones(decoder_layer, num_layers)
         self.num_layers = num_layers
         self.norm = norm
         self.return_intermediate = return_intermediate
+        self.no_pos = no_pos
 
     def forward(self, tgt, memory,
                 tgt_mask: Optional[Tensor] = None,
@@ -123,7 +124,7 @@ class TransformerDecoder(nn.Module):
                            memory_mask=memory_mask,
                            tgt_key_padding_mask=tgt_key_padding_mask,
                            memory_key_padding_mask=memory_key_padding_mask,
-                           pos=pos, query_pos=query_pos if i != 0 else None)  # At the fist layer, the positional encodings are not used
+                           pos=pos, query_pos=query_pos if (i != 0 and self.no_pos is False) else None)  # At the fist layer, the positional encodings are not used
             if self.return_intermediate:
                 intermediate.append(self.norm(output))
 
@@ -321,6 +322,7 @@ def build_transformer(args):
         num_decoder_layers=args.dec_layers,
         normalize_before=args.pre_norm,
         return_intermediate_dec=False,
+        no_pos_decoder=args.no_pos_decoder
     )
 
 
