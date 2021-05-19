@@ -267,12 +267,6 @@ class GetSentence(object):
         elif self.seq_order in ('ls', 'sl'):
             areas = {i: c.item() for i, c in enumerate(target['area'])}
 
-            print(areas)
-            print(areas.items())
-            print(
-                sorted(areas.items(), key=lambda x: x[1])
-            )
-
             if 'ls' in self.seq_order:
                 areas = sorted(areas.items(), key=lambda x: x[1], reverse=True)
             else:
