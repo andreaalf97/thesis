@@ -264,7 +264,7 @@ def plot_image_with_labels(samples: torch.Tensor, targets: torch.Tensor, num_sam
 @torch.no_grad()
 def plot_prediction(samples: utils.NestedTensor, outputs: torch.Tensor, targets: tuple):
 
-    classes_batch = torch.argmax(outputs[:, :, 8:11], dim=2)  # [batch_size, seq_len]
+    confidences, classes_batch = torch.max(outputs[:, :, 8:11], dim=2)  # [batch_size, seq_len]
     coords_batch = outputs[:, :, :8]  # [batch_size, seq_len, 2]
 
     colors = [
@@ -287,20 +287,16 @@ def plot_prediction(samples: utils.NestedTensor, outputs: torch.Tensor, targets:
 
     colors = colors * 5
 
-    for image, class_seq, coords_seq, target in zip(samples.tensors, classes_batch, coords_batch, targets):
-
-        # class_seq [seq_len]
-        # coords_seq [seq_len, 2]
-
+    for image, class_seq, coords_seq, target, confidence in zip(samples.tensors, classes_batch, coords_batch, targets, confidences):
         num_predictions = 0
 
         h, w = list(image.shape)[-2:]
         plt.imshow(image.cpu().permute(1, 2, 0))
 
-        poly = []
-        for cl, xy in zip(class_seq, coords_seq):
+        for cl, xy, color, conf in zip(class_seq, coords_seq, colors, confidence):
             if cl == 1:
-                plt.scatter(xy[::2].cpu() * w, xy[1::2].cpu() * h)
+                plt.scatter(xy[::2].cpu() * w, xy[1::2].cpu() * h, c=color)
+                plt.text(xy[2].cpu() * w, xy[3].cpu() * h, str(conf.item() * 100)[:5] + "%", color=color)
 
 
         # for logit, coord, color in zip(logits, coords, colors):
@@ -572,16 +568,16 @@ def plot_loss(output_file: str):
         return
 
 
-def match_predictions_optim(pred_logits: torch.Tensor, pred_boxes: torch.Tensor, gt_boxes: torch.Tensor) -> tuple:
+def match_predictions_optim(sequence: torch.Tensor, gt_boxes: torch.Tensor) -> tuple:
     """
         This function matches each ground truth mask with a single mask in the predictions
     """
     predictions = []
-    for index, logits in enumerate(pred_logits):
-        confidence, pred_class = torch.max(torch.softmax(logits, dim=0), 0)
-        if pred_class == 0:
+    for i, token in enumerate(sequence):
+        conf, cl = torch.max(token[8:], dim=0)
+        if cl == 1:
             predictions.append((
-                pred_boxes[index], confidence.item(), index
+                token[:8], conf, i
             ))
 
     cost_matrix = [[0 for _ in range(len(predictions))] for _ in range(len(gt_boxes))]
@@ -636,21 +632,14 @@ def evaluate_map(model, data_loader_val, device, args):
 
         outputs = model(images, tgt=torch.stack([target['sequence'] for target in targets])[:, 0, :].unsqueeze(1))
 
-        # outputs = {k: v for k, v in outputs.items() if k != 'aux_outputs'}
+        # plot_prediction(images, outputs, targets)
+        # continue
 
-        plot_prediction(images, outputs, targets)
-        continue
-
-        for pred_logits, pred_boxes, target in zip(outputs['pred_logits'], outputs['pred_boxes'], targets):  # For each image in the dataset
-
-            # print("pred_logits", pred_logits.shape)
-            # print("pred_boxes", pred_boxes.shape)
-            # print("target:\n" + '\n'.join('   ' + str(k) + ' -> ' + str(target[k].shape) for k in target))
+        for sequence, target in zip(outputs, targets):  # For each image in the dataset
 
             '''Scores is a list of tuples as long as the objects in the ground truth: (gt_index, pred_index, iou_score)'''
             scores, false_positives = match_predictions_optim(
-                pred_logits=pred_logits,
-                pred_boxes=pred_boxes,
+                sequence=sequence,
                 gt_boxes=target['boxes']
             )
             img_id = int(target['image_id'].item())
@@ -672,14 +661,14 @@ def evaluate_map(model, data_loader_val, device, args):
                 row['outcome'].append(
                     iou_score
                 )
-                row['gate'].append(pred_boxes[pred_index].tolist())
+                row['gate'].append(sequence[pred_index, :8].tolist())
             for conf, i in false_positives:
                 row['img_id'].append(img_id)
                 row['gt_id'].append(-1)
                 row['pred_id'].append(i)
                 row['confidence'].append(conf)
                 row['outcome'].append(0.0)
-                row['gate'].append(pred_boxes[i].tolist())
+                row['gate'].append(sequence[i, :8].tolist())
 
             results = results.append(pd.DataFrame(row), ignore_index=True)
             image_objects = image_objects.append(pd.DataFrame({
