@@ -88,10 +88,15 @@ class DETR(nn.Module):
 
             memory = self.transformer.encoder(src, src_key_padding_mask=mask, pos=pos_embed)
 
+            query_pos = pos_embed.repeat(2, 1, 1)
+
+            while query_pos.shape[0] < tgt.shape[1]:
+                query_pos = query_pos.repeat(2, 1, 1)
+
             ended = [False for _ in range(bs)]
             while False in ended and tgt.shape[1] < 30:
                 hs = self.transformer.decoder(tgt.permute(1, 0, 2), memory, memory_key_padding_mask=mask,
-                                  pos=pos_embed, query_pos=pos_embed[:tgt.shape[1], :, :])
+                                  pos=pos_embed, query_pos=query_pos[:tgt.shape[1], :, :])
                 new_element = hs.transpose(1, 2)[0, :, -1, :]  # [2, 256]
 
                 pred_logits = torch.softmax(self.class_embed(new_element), dim=-1)
