@@ -220,6 +220,9 @@ def main(args):
     #         args.start_epoch = checkpoint['epoch'] + 1
 
     if args.eval:
+        torch.manual_seed(seed)
+        np.random.seed(seed)
+        random.seed(seed)
         if args.training_output_file != '':
             plot_loss(args.training_output_file)
         evaluate_map(model, data_loader_val, device, args)
