@@ -21,6 +21,7 @@ from shapely.geometry import MultiPoint
 from shapely.errors import TopologicalError
 import pandas as pd
 from os.path import join
+import random
 
 
 def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
@@ -601,7 +602,7 @@ def match_predictions_optim(pred_logits: torch.Tensor, pred_boxes: torch.Tensor,
 
 
 @torch.no_grad()
-def evaluate_map(model, data_loader_val, device, args):
+def evaluate_map(model, data_loader_val, device, seed, args):
     assert args.pretrained_model != '', "Give path to pretrained model with --pretrained_model"
 
     print("######################")
@@ -626,6 +627,11 @@ def evaluate_map(model, data_loader_val, device, args):
         'gates': []
     })
 
+    seed_i = 0
+    torch.manual_seed(seed + seed_i)
+    np.random.seed(seed + seed_i)
+    random.seed(seed + seed_i)
+
     for iteration, (images, targets) in enumerate(data_loader_val):
         images = images.to(device)
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
@@ -634,6 +640,12 @@ def evaluate_map(model, data_loader_val, device, args):
         outputs = {k: v for k, v in outputs.items() if k != 'aux_outputs'}
 
         plot_prediction(images, outputs, targets)
+
+        seed_i += 1
+        torch.manual_seed(seed + seed_i)
+        np.random.seed(seed + seed_i)
+        random.seed(seed + seed_i)
+
         continue
 
         for pred_logits, pred_boxes, target in zip(outputs['pred_logits'], outputs['pred_boxes'], targets):  # For each image in the dataset
