@@ -222,7 +222,7 @@ def main(args):
     if args.eval:
         if args.training_output_file != '':
             plot_loss(args.training_output_file)
-        evaluate_map(model, data_loader_val, device, seed, args)
+        evaluate_map(model, data_loader_val, device, args)
         # evaluate_toy_setting(model, data_loader_val, criterion, device, args)
         return
 

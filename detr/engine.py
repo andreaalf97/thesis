@@ -640,11 +640,6 @@ def evaluate_map(model, data_loader_val, device, seed, args):
         'gates': []
     })
 
-    seed_i = 0
-    torch.manual_seed(seed + seed_i)
-    np.random.seed(seed + seed_i)
-    random.seed(seed + seed_i)
-
     for iteration, (images, targets) in enumerate(data_loader_val):
         images = images.to(device)
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
@@ -654,12 +649,6 @@ def evaluate_map(model, data_loader_val, device, seed, args):
         # outputs = {k: v for k, v in outputs.items() if k != 'aux_outputs'}
 
         plot_prediction(images, outputs, targets)
-
-        seed_i += 1
-        torch.manual_seed(seed + seed_i)
-        np.random.seed(seed + seed_i)
-        random.seed(seed + seed_i)
-
         continue
 
         for pred_logits, pred_boxes, target in zip(outputs['pred_logits'], outputs['pred_boxes'], targets):  # For each image in the dataset
