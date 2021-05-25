@@ -88,7 +88,7 @@ class DETR(nn.Module):
             memory = self.transformer.encoder(src, src_key_padding_mask=mask, pos=pos_embed)
 
             ended = [False for _ in range(bs)]
-            while False in ended and tgt.shape[1] < 30:
+            while False in ended and tgt.shape[1] < 3000:
                 hs = self.transformer.decoder(tgt.permute(1, 0, 2), memory, memory_key_padding_mask=mask,
                                   pos=pos_embed, query_pos=pos_embed[:tgt.shape[1], :, :])
                 new_element = hs.transpose(1, 2)[0, :, -1, :]  # [2, 1, 256]
