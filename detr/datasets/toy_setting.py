@@ -264,79 +264,61 @@ class Clamp(object):
 
 
 class GetSentence(object):
-    def __init__(self, num_gates, num_corners, random_order=False):
+    def __init__(self, num_gates, num_corners, seq_order='lr'):
+        assert num_corners == 4, "This branch does not support polygons that don't have 4 corners"
         self.num_gates = num_gates
         self.num_corners = num_corners if num_corners != -1 else PolyGate.MAX_CORNERS
-        self.random_order = random_order
+        self.seq_order = seq_order
 
     def __call__(self, sample):
         img, target = sample
 
         max_lenght = self.num_gates + 2
 
-        if self.random_order:
+        sequence = []
+        start_token = torch.zeros(256)
+        start_token[8 + CLASSES['<start>']] = 1
+        sequence.append(start_token)
+
+        if self.seq_order == 'random':
             raise Exception("Not ready for random ordering of polygons")
-            num_polygons = target['boxes'].shape[0]
-
-            perm = torch.randperm(num_polygons)
-
-            polygons = target['boxes'].view(num_polygons, -1, 2)
-            polygons = polygons[perm, :, :]
-
-            sequence = []
-            start_token = torch.zeros(256)
-            start_token[2 + CLASSES['<start>']] = 1
-            sequence.append(start_token)
-
-            for polygon in polygons:
-                num_points = polygon.shape[0]
-                perm = torch.randperm(num_points)
-
-                for point in polygon[perm, :]:
-                    if point[0] != -1:
-                        token = torch.zeros(256)
-                        token[2 + CLASSES['<point>']] = 1
-                        token[:2] = point
-                        sequence.append(token)
-                token = torch.zeros(256)
-                token[2 + CLASSES['<end-of-polygon>']] = 1
-                sequence.append(token)
-        else:
+        elif self.seq_order in ['lr', 'rl', 'tb', 'bt']:
             centers = []
             for polygon in target['boxes']:
-                # index = len(polygon)
-                # for i, value in enumerate(polygon):
-                #     if value == -1:
-                #         index = i
-                #         break
                 mean_x = polygon[::2].mean().item()
                 mean_y = polygon[1::2].mean().item()
                 centers.append((mean_x, mean_y))
             centers = {i: c for i, c in enumerate(centers)}
 
-            sequence = []
-            start_token = torch.zeros(256)
-            start_token[8 + CLASSES['<start>']] = 1
-            sequence.append(start_token)
+            if self.seq_order == 'lr':
+                centers = sorted(centers.items(), key=lambda x: x[1][0])
+            elif self.seq_order == 'rl':
+                centers = sorted(centers.items(), key=lambda x: x[1][0], reverse=True)
+            elif self.seq_order == 'tb':
+                centers = sorted(centers.items(), key=lambda x: x[1][1])
+            elif self.seq_order == 'bt':
+                centers = sorted(centers.items(), key=lambda x: x[1][1], reverse=True)
 
-            while len(centers) > 0:
-                min_center = [2, 2]
-                for index in centers:
-                    x, y = centers[index]
-                    if y < min_center[1]:
-                        min_center = (x, y)
-                        min_index = index
-                    elif y == min_center[1] and x < min_center[0]:
-                        min_center = (x, y)
-                        min_index = index
-
-                polygon = target['boxes'][min_index]
+            for i, center in centers:
+                polygon = target['boxes'][i]
                 token = torch.zeros(256)
                 token[8 + CLASSES['<polygon>']] = 1
                 token[:8] = polygon
                 sequence.append(token)
+        elif self.seq_order in ['sl', 'ls']:
+            areas = {i: c.item() for i, c in enumerate(target['area'])}
 
-                centers.pop(min_index)
+            if 'ls' in self.seq_order:
+                areas = sorted(areas.items(), key=lambda x: x[1], reverse=True)
+            else:
+                areas = sorted(areas.items(), key=lambda x: x[1], reverse=False)
+
+            for element in areas:
+                polygon = target['boxes'][element[0]]
+                token = torch.zeros(256)
+                token[8 + CLASSES['<polygon>']] = 1
+                token[:8] = polygon
+                sequence.append(token)
 
         while len(sequence) < max_lenght:
             end_computation = torch.zeros(256)
@@ -397,19 +379,9 @@ class MaskRCNN(object):
 
 class TSDataset(torch.utils.data.Dataset):
 
-    std_transform = T.Compose([
-        ToTensor(),
-        # Clamp()
-    ])
-
-    mask_transform = T.Compose([
-        ToTensor(),
-        MaskRCNN(),
-        # Clamp()
-    ])
-
     def __init__(self, img_height, img_width, num_gates=3, black_and_white=True,
-                 no_gate_chance=0.0, stroke=-1, num_corners=4, mask=False, clamp_gates=False, random_order=False):
+                 no_gate_chance=0.0, stroke=-1, num_corners=4, mask=False, clamp_gates=False, seq_order='tb'):
+        assert seq_order in ('ls', 'sl', 'lr', 'rl', 'tb', 'bt', 'random'), f"{seq_order} order not implemented for TOY SETTING"
         self.img_height = img_height
         self.img_width = img_width
         self.num_gates = num_gates
@@ -418,12 +390,20 @@ class TSDataset(torch.utils.data.Dataset):
         self.stroke = stroke
         self.num_corners = num_corners
         self.clamp_gates = clamp_gates
-        self.random_order = random_order
+        self.seq_order = seq_order
         if mask:
-            self.transform = self.mask_transform
+            self.transform = T.Compose([
+                    ToTensor(),
+                    MaskRCNN(),
+                    # Clamp()
+                ])
             self.label = 1
         else:
-            self.transform = self.std_transform
+            self.transform = T.Compose([
+                    ToTensor(),
+                    # Clamp(),
+                    GetSentence(self.num_gates, self.num_corners, seq_order=self.seq_order)
+                ])
             self.label = 0
 
     def __len__(self):
@@ -454,15 +434,13 @@ class TSDataset(torch.utils.data.Dataset):
 
         if self.transform:
             image, target = self.transform((image, target))
-            t = GetSentence(self.num_gates, self.num_corners, random_order=self.random_order)
-            image, target = t((image, target))
 
         return image, target
 
 
 if __name__ == '__main__':
 
-    ds = TSDataset(256, 256, num_gates=5, black_and_white=True, no_gate_chance=0.0, stroke=-1, num_corners=4, mask=False, clamp_gates=True, random_order=False)
+    ds = TSDataset(256, 256, num_gates=4, black_and_white=True, no_gate_chance=0.0, stroke=-1, num_corners=4, mask=False, clamp_gates=True, seq_order='sl')
 
     start = 0
     point = 0
@@ -480,15 +458,13 @@ if __name__ == '__main__':
         sequence = target['sequence']
         print(sequence[:, :11])
 
-        for element in sequence[1:]:
+        for i, element in enumerate(sequence[1:]):
             if element[8 + CLASSES['<end-of-computation>']] == 1:
                 break
             x = element[:8:2] * 256
             y = element[1:8:2] * 256
 
-            for i, (a, b) in enumerate(zip(x, y)):
-                plt.scatter(a.cpu(), b.cpu(), label=i)
-            break
+            plt.scatter(x.cpu(), y.cpu(), label=i)
 
         plt.legend()
         plt.show()
