@@ -73,6 +73,7 @@ class DETR(nn.Module):
         if not self.training:
 
             tgt = tgt[:, 0, :].unsqueeze(1)  # During evaluation we only pass the start token and use the predictions
+            fake_tgt = tgt[:, 0, :6].unsqueeze(1).clone()
 
             src = self.input_proj(src)
             mask = mask
@@ -87,29 +88,42 @@ class DETR(nn.Module):
 
             memory = self.transformer.encoder(src, src_key_padding_mask=mask, pos=pos_embed)
 
+            query_pos = pos_embed.repeat(2, 1, 1)
+
+            while query_pos.shape[0] < tgt.shape[1]:
+                query_pos = query_pos.repeat(2, 1, 1)
+
             ended = [False for _ in range(bs)]
             while False in ended and tgt.shape[1] < 3000:
                 hs = self.transformer.decoder(tgt.permute(1, 0, 2), memory, memory_key_padding_mask=mask,
-                                  pos=pos_embed, query_pos=pos_embed[:tgt.shape[1], :, :])
-                new_element = hs.transpose(1, 2)[0, :, -1, :]  # [2, 1, 256]
+                                  pos=pos_embed, query_pos=query_pos[:tgt.shape[1], :, :])
+                new_element = hs.transpose(1, 2)[0, :, -1, :]  # [2, 256]
 
-                pred_class = torch.argmax(self.class_embed(new_element), dim=1)
+                pred_logits = torch.softmax(self.class_embed(new_element), dim=-1)
+                confidences, pred_class = torch.max(pred_logits, dim=1)
                 pred_coord = self.bbox_embed(new_element).sigmoid()
 
                 new_tensor = []
-                for i, (batch_class, batch_coord) in enumerate(zip(pred_class, pred_coord)):
+                fake_new_tensor = []
+                for i, (batch_class, batch_coord, confidence) in enumerate(zip(pred_class, pred_coord, confidences)):
                     t = torch.zeros(256).to(tgt.device)
+                    fake_t = torch.zeros(6).to(tgt.device)
                     t[2 + batch_class] = 1
+                    fake_t[2 + batch_class] = confidence
                     if batch_class == 1:  # <point> class
                         t[:2] = batch_coord
+                        fake_t[:2] = batch_coord
                     if batch_class == 3:  # <end-of-computation> class
                         ended[i] = True
                     new_tensor.append(t)
+                    fake_new_tensor.append(fake_t)
                 new_tensor = torch.stack(new_tensor).unsqueeze(1)
+                fake_new_tensor = torch.stack(fake_new_tensor).unsqueeze(1)
 
                 tgt = torch.cat([tgt, new_tensor], dim=1)
+                fake_tgt = torch.cat([fake_tgt, fake_new_tensor], dim=1)
 
-            return tgt[:, :, :6]
+            return fake_tgt
 
         hs = self.transformer(self.input_proj(src), mask, self.query_embed.weight, pos[-1], tgt=tgt)[0]
 

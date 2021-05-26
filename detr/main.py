@@ -57,6 +57,7 @@ def get_args_parser():
     parser.add_argument('--num_queries', default=26, type=int,
                         help="Number of query slots")
     parser.add_argument('--pre_norm', action='store_true')
+    parser.add_argument('--no_pos_decoder', action='store_true')  # This removes the positional encodings from the decoder sequence
 
     # * Segmentation
     parser.add_argument('--masks', action='store_true',
