@@ -312,8 +312,9 @@ class SetCriterion(nn.Module):
         last_dim = tgt_boxes[:, -1, :]
         tgt_boxes = torch.cat([tgt_boxes[:, 1:, :], last_dim.unsqueeze(1)], dim=1)
 
-        condition = torch.where(tgt_logits != 1, True, False).unsqueeze(-1).expand(-1, -1, 2)
-        outputs_without_aux['pred_boxes'] = torch.where(condition, tgt_boxes, outputs_without_aux['pred_boxes'])
+        condition = torch.where(tgt_logits != 1, 0., 1.).unsqueeze(-1).expand(-1, -1, 2)
+        # outputs_without_aux['pred_boxes'] = torch.where(condition, tgt_boxes, outputs_without_aux['pred_boxes'])
+        outputs_without_aux['pred_boxes'] = outputs_without_aux['pred_boxes'] * condition
 
         loss_dict = {
             'loss_ce': F.cross_entropy(outputs_without_aux['pred_logits'].permute(0, 2, 1), tgt_logits, reduction='sum'),
