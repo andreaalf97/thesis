@@ -10,6 +10,10 @@ import matplotlib.pyplot as plt
 
 
 class PolyGate:
+
+    MIN_CORNERS = 3
+    MAX_CORNERS = 7
+
     def __init__(self, image_height, image_width, color='none', num_corners=-1, stroke=-1, clamp=True):
 
         self.image_height, self.image_width = image_height, image_width
@@ -23,7 +27,7 @@ class PolyGate:
         self.radius = image_height * radius_perc
 
         if num_corners == -1:
-            num_corners = random.randint(3, 8)
+            num_corners = random.randint(self.MIN_CORNERS, self.MAX_CORNERS)
 
         self.corners = []
 
@@ -33,7 +37,7 @@ class PolyGate:
             x = self.c_x + self.radius * math.cos(alpha)
             y = self.c_y + self.radius * math.sin(alpha)
             slope = math.tan(alpha) if alpha != math.pi/2 else math.tan(alpha + 0.001)
-            delta_x = random.uniform(0.0, math.sqrt(self.radius))
+            delta_x = random.uniform(0.0, math.sqrt(self.radius)/2)
             delta_y = slope * delta_x
 
             final_x = int(x+delta_x)
@@ -66,12 +70,18 @@ class PolyGate:
         else:
             raise Exception(f"Color {color} not supported")
 
+        self.valid = validate_poly(self.corners)
+
     def get_labels(self) -> list:
         labels = []
 
         for corner in self.corners:
             labels.append(corner[0]/self.image_width)
             labels.append(corner[1]/self.image_height)
+
+        if self.num_corners == -1:
+            while len(labels) != 2*self.MAX_CORNERS:
+                labels.append(-1)
 
         return labels
 
@@ -98,8 +108,12 @@ def get_ts_image(height, width, num_gates=3, no_gate_chance=0.10, black_and_whit
     for _ in range(num_gates):
         if black_and_white:
             gate = PolyGate(height, width, color='white', stroke=stroke, num_corners=num_corners, clamp=clamp)
+            while not gate.valid:
+                gate = PolyGate(height, width, color='white', stroke=stroke, num_corners=num_corners, clamp=clamp)
         else:
             gate = PolyGate(height, width, color='none', stroke=stroke, num_corners=num_corners, clamp=clamp)
+            while not gate.valid:
+                gate = PolyGate(height, width, color='none', stroke=stroke, num_corners=num_corners, clamp=clamp)
 
         labels.append(gate.get_labels())
         areas.append(gate.get_area())
@@ -131,6 +145,52 @@ def print_polygate(img: np.ndarray, gate: PolyGate) -> np.ndarray:
     )
 
     return img
+
+
+def validate_poly(corners):
+
+    if len(corners) == 3:
+        return True
+
+    lines = []
+
+    # Create list of lines
+    lines.append([corners[0], corners[1]])
+    for i in range(1, len(corners)-1):
+        lines.append([corners[i], corners[i+1]])
+    lines.append([corners[-1], corners[0]])
+
+    for i in range(len(lines)):
+        temp_lines = lines.copy()
+        temp_lines.remove(lines[i + 1] if i + 1 < len(lines) else lines[0])
+        temp_lines.remove(lines[i])
+        temp_lines.remove(lines[i - 1])
+
+        for line_2 in temp_lines:
+            if line_intersection(lines[i], line_2):
+                return False
+
+    return True
+
+
+def line_intersection(line1, line2):
+
+    a, b = line1
+    c, d = line2
+
+    if clockwise(a, b, c) * clockwise(a, b, d) > 0:
+        return False
+    if clockwise(c, d, a) * clockwise(c, d, b) > 0:
+        return False
+    return True
+
+
+def clockwise(a, b, c):
+    ax, ay = a
+    bx, by = b
+    cx, cy = c
+
+    return (bx - ax) * (cy - ay) - (cx - ax) * (by - ay)
 
 
 def get_ts_background(height, width, bgr=False, black_white=False) -> np.ndarray:
@@ -245,17 +305,6 @@ class MaskRCNN(object):
 
 class TSDataset(torch.utils.data.Dataset):
 
-    std_transform = T.Compose([
-        ToTensor(),
-        Clamp()
-    ])
-
-    mask_transform = T.Compose([
-        ToTensor(),
-        MaskRCNN(),
-        Clamp()
-    ])
-
     def __init__(self, img_height, img_width, num_gates=3, black_and_white=True,
                  no_gate_chance=0.0, stroke=-1, num_corners=4, mask=False, clamp_gates=False):
         self.img_height = img_height
@@ -267,10 +316,17 @@ class TSDataset(torch.utils.data.Dataset):
         self.num_corners = num_corners
         self.clamp_gates = clamp_gates
         if mask:
-            self.transform = self.mask_transform
+            self.transform = T.Compose([
+                    ToTensor(),
+                    MaskRCNN(),
+                    # Clamp()
+                ])
             self.label = 1
         else:
-            self.transform = self.std_transform
+            self.transform = T.Compose([
+                    ToTensor(),
+                    # Clamp(),
+                ])
             self.label = 0
 
     def __len__(self):
