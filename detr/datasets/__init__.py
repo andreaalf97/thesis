@@ -25,7 +25,7 @@ def build_dataset(image_set, args):
         from .coco_panoptic import build as build_coco_panoptic
         return build_coco_panoptic(image_set, args)
     if args.dataset_file == 'toy_setting':
-        return TSDataset(256, 256, num_gates=args.num_gates, black_and_white=True, no_gate_chance=0.0, stroke=-1, num_corners=-1, mask=False, clamp_gates=True, seq_order=args.seq_order)
+        return TSDataset(256, 256, num_gates=args.num_gates, black_and_white=True, no_gate_chance=0.0, stroke=-1, num_corners=args.num_corners, mask=False, clamp_gates=True, seq_order=args.seq_order)
     if args.dataset_file == 'real_gates':
         return RealGatesDS(args.real_gate_path, pkl_path=args.real_gate_pickle_path, image_set=image_set, seq_order=args.seq_order)
     raise ValueError(f'dataset {args.dataset_file} not supported')

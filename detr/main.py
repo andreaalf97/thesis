@@ -88,6 +88,7 @@ def get_args_parser():
     parser.add_argument('--coco_panoptic_path', type=str)
     parser.add_argument('--remove_difficult', action='store_true')
     parser.add_argument('--num_gates', default=4, type=int)
+    parser.add_argument('--num_corners', default=-1, type=int)
     parser.add_argument('--seq_order', default='tb', type=str, choices=('tb', 'bt', 'ls', 'sl', 'lr', 'rl', 'random'),
                         help="Order of the polygons within the sequence")
 
