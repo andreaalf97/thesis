@@ -90,20 +90,20 @@ if __name__ == '__main__':
 
     num_classes = 2
 
-    path = "/tudelft.net/staff-bulk/ewi/insy/VisionLab/yanconglin/dataset/gate_samples"
-    # path = "toy_setting"
+    # path = "/tudelft.net/staff-bulk/ewi/insy/VisionLab/yanconglin/dataset/gate_samples"
+    path = "toy_setting"
     pkl_path = "/home/nfs/andreaalfieria/STD_TRAIN_daylight15k_irosFrontal.pkl"
     # path = "/home/andreaalf/Documents/thesis/datasets/gate_samples"
     # pkl_path = "/home/andreaalf/Documents/thesis/datasets/normalized_train_8000imgs.pkl"
 
-    # resume_from = ""
-    resume_from = "/home/nfs/andreaalfieria/thesis/detr/tmp/maskrcnn_STD_150epochs_checkpoint.pth"
+    resume_from = ""
+    # resume_from = "/home/nfs/andreaalfieria/thesis/detr/tmp/maskrcnn_STD_150epochs_checkpoint.pth"
 
     #############################################
     # EVALUATION PARAMETERS
     # Comment this out for no evaluation
-    eval_model = "/home/nfs/andreaalfieria/thesis/detr/tmp/maskrcnn_STD_300epochs.pth"
-    # eval_model = ""
+    # eval_model = "/home/nfs/andreaalfieria/thesis/detr/tmp/maskrcnn_STD_300epochs.pth"
+    eval_model = ""
     # eval_model = "/home/andreaalf/Documents/thesis/detr/results/baseline_comparison/maskrcnn_uniform8000_100epochs.pth"
     eval_pkl_path = "/home/nfs/andreaalfieria/STD_TEST_basement.pkl"
     # eval_pkl_path = "/home/andreaalf/Documents/thesis/datasets/normalized_test_2000imgs.pkl"
@@ -128,11 +128,11 @@ if __name__ == '__main__':
         exit(0)
     #############################################
 
-    save_model_to = "/home/nfs/andreaalfieria/thesis/detr/tmp/maskrcnn_STD_300epochs.pth"
+    save_model_to = "/tudelft.net/staff-bulk/ewi/insy/VisionLab/students/andreaalf/exp5/R.pth"
     # save_model_to = ""
-    num_epochs = 150
+    num_epochs = 300
     batch_size = 8
-    drop_lr_after = 100
+    drop_lr_after = 200
     learning_rate = 0.005
     # learning_rate = 1e-4
 
@@ -233,10 +233,10 @@ if __name__ == '__main__':
         print(f"{end-start}s for this epoch")
         ex_times.append(end-start)
 
-        if save_model_to != "" and ((epoch+1) % 25 == 0):
-            print(f"Saving backup of epoch {epoch+150} at {save_model_to.replace('.pth', f'_checkpoint{epoch+150}.pth')}")
-            torch.save(model.state_dict(), save_model_to.replace('.pth', f'_checkpoint{epoch+150}.pth'))
-            print("SAVED MODEL at", save_model_to.replace('.pth', f'_checkpoint{epoch+150}.pth'))
+        if save_model_to != "" and ((epoch+1) % 50 == 0):
+            print(f"Saving backup of epoch {epoch} at {save_model_to.replace('.pth', f'_checkpoint{epoch}.pth')}")
+            torch.save(model.state_dict(), save_model_to.replace('.pth', f'_checkpoint{epoch}.pth'))
+            print("SAVED MODEL at", save_model_to.replace('.pth', f'_checkpoint{epoch}.pth'))
 
     print("FINISHED TRAINING")
     print("Average training time: %.4f s/epoch" % (sum(ex_times)/num_epochs))
