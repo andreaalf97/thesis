@@ -75,7 +75,7 @@ def get_args_parser():
     # * Loss coefficients
     parser.add_argument('--mask_loss_coef', default=1, type=float)
     parser.add_argument('--dice_loss_coef', default=1, type=float)
-    parser.add_argument('--bbox_loss_coef', default=2, type=float) # Default 5
+    parser.add_argument('--bbox_loss_coef', default=5, type=float) # Default 5
     parser.add_argument('--giou_loss_coef', default=2, type=float)  # Default 2
     parser.add_argument('--eos_coef', default=0.1, type=float,
                         help="Relative classification weight of the no-object class")
@@ -83,11 +83,12 @@ def get_args_parser():
     # dataset parameters
     parser.add_argument('--dataset_file', default='toy_setting')  # 'toy_setting' for generated images, 'real_gates' otherwise
     parser.add_argument('--colored', action='store_true')  # To train or test on colored images
-    parser.add_argument('--seq_order', type=str, default="sl")  # To train with different sequence orderings
     parser.add_argument('--coco_path', type=str, default="")  # /home/andreaalf/Documents/detr/coco_dataset
     parser.add_argument('--coco_panoptic_path', type=str)
     parser.add_argument('--remove_difficult', action='store_true')
     parser.add_argument('--num_gates', default=4, type=int)
+    parser.add_argument('--seq_order', default='tb', type=str, choices=('tb', 'bt', 'ls', 'sl', 'lr', 'rl', 'random'),
+                        help="Order of the polygons within the sequence")
 
     # Args for REAL GATE Dataset
     parser.add_argument('--real_gate_path', type=str,
