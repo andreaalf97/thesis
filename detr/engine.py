@@ -482,32 +482,23 @@ def valid_box(box: torch.Tensor) -> bool:
     return False
 
 
-def iou(prediction: torch.Tensor, gt: torch.Tensor) -> float:
+def iou(prediction: list, gt: torch.Tensor) -> float:
 
-    pred_bl = [prediction[0].item(), prediction[1].item()]
-    pred_tl = [prediction[2].item(), prediction[3].item()]
-    pred_tr = [prediction[4].item(), prediction[5].item()]
-    pred_br = [prediction[6].item(), prediction[7].item()]
-
-    gt_bl = [gt[0].item(), gt[1].item()]
-    gt_tl = [gt[2].item(), gt[3].item()]
-    gt_tr = [gt[4].item(), gt[5].item()]
-    gt_br = [gt[6].item(), gt[7].item()]
+    pred_points, gt_points = [], []
+    for i in range(0, len(prediction) - 1, 2):
+        pred_points.append((
+            prediction[i], prediction[i+1]
+        ))
+    for i in range(0, len(gt) - 1, 2):
+        if gt[i] == -1:
+            break
+        gt_points.append((
+            gt[i].item(), gt[i+1].item()
+        ))
 
     try:
-        pred_poly = MultiPoint([
-            pred_bl,
-            pred_tl,
-            pred_tr,
-            pred_br
-        ]).convex_hull
-
-        gt_poly = MultiPoint([
-            gt_bl,
-            gt_tl,
-            gt_tr,
-            gt_br
-        ]).convex_hull
+        pred_poly = MultiPoint(pred_points).convex_hull
+        gt_poly = MultiPoint(gt_points).convex_hull
 
         intersection = pred_poly.intersection(gt_poly).area
         union = pred_poly.area + gt_poly.area - intersection
@@ -515,6 +506,7 @@ def iou(prediction: torch.Tensor, gt: torch.Tensor) -> float:
 
         return intersection/union
     except TopologicalError:
+        print("TopologicalError ERROR")
         return -1
 
 
@@ -582,17 +574,27 @@ def plot_loss(output_file: str):
         return
 
 
-def match_predictions_optim(pred_logits: torch.Tensor, pred_boxes: torch.Tensor, gt_boxes: torch.Tensor) -> tuple:
+def match_predictions_optim(sequence: torch.Tensor, gt_boxes: torch.Tensor) -> tuple:
     """
         This function matches each ground truth mask with a single mask in the predictions
     """
     predictions = []
-    for index, logits in enumerate(pred_logits):
-        confidence, pred_class = torch.max(torch.softmax(logits, dim=0), 0)
-        if pred_class == 0:
-            predictions.append((
-                pred_boxes[index], confidence.item(), index
-            ))
+    points, confidences, i = [], [], 0
+    for token in sequence:
+        conf, pred_class = torch.max(token[2:], dim=-1)
+        if pred_class == 1:  # <point> class
+            points.append(token[0].item())
+            points.append(token[1].item())
+            confidences.append(conf.item())
+        else:
+            if len(confidences) > 0:
+                predictions.append((
+                    points,
+                    sum(confidences)/len(confidences),
+                    i
+                ))
+                i += 1
+            points, confidences = [], []
 
     cost_matrix = [[0 for _ in range(len(predictions))] for _ in range(len(gt_boxes))]
     for i, gt_box in enumerate(gt_boxes):  # For each GT mask we find the best match
@@ -614,8 +616,22 @@ def match_predictions_optim(pred_logits: torch.Tensor, pred_boxes: torch.Tensor,
     return [[i, predictions[j][2], cost_matrix[i][j], predictions[j][1]] for i, j in zip(match[0], match[1])], false_positives
 
 
+def get_poly_from_index(sequence, pred_index):
+    points, i = [], 0
+    for token in sequence:
+        pred_class = torch.argmax(token[2:], dim=-1)
+        if pred_class == 1:  # <point> class
+            points.append(token[0].item())
+            points.append(token[1].item())
+        else:
+            if len(points) > 0:
+                if i == pred_index:
+                    return points
+                i += 1
+            points = []
+
 @torch.no_grad()
-def evaluate_map(model, data_loader_val, device, seed, args):
+def evaluate_map(model, data_loader_val, device, args):
     assert args.pretrained_model != '', "Give path to pretrained model with --pretrained_model"
 
     print("######################")
@@ -648,10 +664,10 @@ def evaluate_map(model, data_loader_val, device, seed, args):
 
         # outputs = {k: v for k, v in outputs.items() if k != 'aux_outputs'}
 
-        plot_prediction(images, outputs, targets)
-        continue
+        # plot_prediction(images, outputs, targets)
+        # continue
 
-        for pred_logits, pred_boxes, target in zip(outputs['pred_logits'], outputs['pred_boxes'], targets):  # For each image in the dataset
+        for sequence, target in zip(outputs, targets):  # For each image in the dataset
 
             # print("pred_logits", pred_logits.shape)
             # print("pred_boxes", pred_boxes.shape)
@@ -659,8 +675,7 @@ def evaluate_map(model, data_loader_val, device, seed, args):
 
             '''Scores is a list of tuples as long as the objects in the ground truth: (gt_index, pred_index, iou_score)'''
             scores, false_positives = match_predictions_optim(
-                pred_logits=pred_logits,
-                pred_boxes=pred_boxes,
+                sequence=sequence,
                 gt_boxes=target['boxes']
             )
             img_id = int(target['image_id'].item())
@@ -682,14 +697,14 @@ def evaluate_map(model, data_loader_val, device, seed, args):
                 row['outcome'].append(
                     iou_score
                 )
-                row['gate'].append(pred_boxes[pred_index].tolist())
+                row['gate'].append(get_poly_from_index(sequence, pred_index))
             for conf, i in false_positives:
                 row['img_id'].append(img_id)
                 row['gt_id'].append(-1)
                 row['pred_id'].append(i)
                 row['confidence'].append(conf)
                 row['outcome'].append(0.0)
-                row['gate'].append(pred_boxes[i].tolist())
+                row['gate'].append(get_poly_from_index(sequence, i))
 
             results = results.append(pd.DataFrame(row), ignore_index=True)
             image_objects = image_objects.append(pd.DataFrame({
@@ -715,7 +730,7 @@ def evaluate_map(model, data_loader_val, device, seed, args):
 
     print("SAVING RESULTS TO" + res_path)
     results.to_pickle(res_path)
-    # image_objects.to_pickle(ds_info_path)
+    image_objects.to_pickle(ds_info_path)
 
 
 @torch.no_grad()

@@ -384,8 +384,10 @@ class MaskRCNN(object):
 class TSDataset(torch.utils.data.Dataset):
 
     def __init__(self, img_height, img_width, num_gates=3, black_and_white=True,
-                 no_gate_chance=0.0, stroke=-1, num_corners=4, mask=False, clamp_gates=False, seq_order='lr'):
+                 no_gate_chance=0.0, stroke=-1, num_corners=4, mask=False, clamp_gates=False, seq_order='lr',
+                 image_set='train'):
         assert seq_order in ['lr', 'rl', 'tb', 'bt', 'sl', 'ls', 'random'], f"TOY SETTING not ready for {seq_order} sequence order"
+        assert image_set in ('train', 'val')
         self.img_height = img_height
         self.img_width = img_width
         self.num_gates = num_gates
@@ -395,6 +397,7 @@ class TSDataset(torch.utils.data.Dataset):
         self.num_corners = num_corners
         self.clamp_gates = clamp_gates
         self.seq_order = seq_order
+        self.image_set = image_set
         if mask:
             self.transform = T.Compose([
                     ToTensor(),
@@ -411,7 +414,7 @@ class TSDataset(torch.utils.data.Dataset):
             self.label = 0
 
     def __len__(self):
-        return 10000
+        return 10000 if self.image_set == 'train' else 3000
 
     def __getitem__(self, index):
         image, labels, areas, classes = get_ts_image(
