@@ -602,7 +602,7 @@ def match_predictions_optim(pred_logits: torch.Tensor, pred_boxes: torch.Tensor,
 
 
 @torch.no_grad()
-def evaluate_map(model, data_loader_val, device, seed, args):
+def evaluate_map(model, data_loader_val, device, args):
     assert args.pretrained_model != '', "Give path to pretrained model with --pretrained_model"
 
     print("######################")
@@ -626,7 +626,6 @@ def evaluate_map(model, data_loader_val, device, seed, args):
         'num_objects': [],
         'gates': []
     })
-
 
     for iteration, (images, targets) in enumerate(data_loader_val):
         images = images.to(device)
@@ -703,7 +702,6 @@ def evaluate_map(model, data_loader_val, device, seed, args):
     print("SAVING RESULTS TO" + res_path)
     results.to_pickle(res_path)
     image_objects.to_pickle(ds_info_path)
-
 
 
 @torch.no_grad()
