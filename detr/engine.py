@@ -679,7 +679,7 @@ def evaluate_map(model, data_loader_val, device, args):
 
     print("SAVING RESULTS TO" + res_path)
     results.to_pickle(res_path)
-    # image_objects.to_pickle(ds_info_path)
+    image_objects.to_pickle(ds_info_path)
 
 
 @torch.no_grad()
