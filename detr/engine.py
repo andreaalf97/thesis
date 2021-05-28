@@ -635,8 +635,8 @@ def evaluate_map(model, data_loader_val, device, seed, args):
         outputs = model(images)
         outputs = {k: v for k, v in outputs.items() if k != 'aux_outputs'}
 
-        plot_prediction(images, outputs, targets)
-        continue
+        # plot_prediction(images, outputs, targets)
+        # continue
 
         for pred_logits, pred_boxes, target in zip(outputs['pred_logits'], outputs['pred_boxes'], targets):  # For each image in the dataset
 
@@ -702,7 +702,8 @@ def evaluate_map(model, data_loader_val, device, seed, args):
 
     print("SAVING RESULTS TO" + res_path)
     results.to_pickle(res_path)
-    # image_objects.to_pickle(ds_info_path)
+    image_objects.to_pickle(ds_info_path)
+
 
 
 @torch.no_grad()
