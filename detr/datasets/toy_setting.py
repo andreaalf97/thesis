@@ -414,7 +414,7 @@ class TSDataset(torch.utils.data.Dataset):
             self.label = 0
 
     def __len__(self):
-        return 10000 if self.image_set == 'train' else 3000
+        return 10000
 
     def __getitem__(self, index):
         image, labels, areas, classes = get_ts_image(
