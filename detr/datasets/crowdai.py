@@ -9,6 +9,14 @@ import random
 import pandas as pd
 
 
+CLASSES = {
+    "<start>": 0,
+    "<point>": 1,
+    "<end-of-polygon>": 2,
+    "<end-of-computation>": 3
+}
+
+
 class ToTensor(object):
     def __init__(self):
         self.transform = T.ToTensor()
@@ -224,42 +232,106 @@ class Hue(object):
             img = self.b(img)
         return img, target
 
+class GetSentence(object):
+    def __init__(self, seq_order='lr'):
+        self.seq_order = seq_order
+
+    def __call__(self, sample):
+        img, target = sample
+
+        sequence = []
+        start_token = torch.zeros(256)
+        start_token[2 + CLASSES['<start>']] = 1
+        sequence.append(start_token)
+
+        if self.seq_order == 'random':
+            raise Exception("Not ready for random sequence order")
+        else:
+            centers = []
+            for polygon in target['boxes']:
+                index = len(polygon)
+                for i, value in enumerate(polygon):
+                    if value == -1:
+                        index = i
+                        break
+                mean_x = polygon[:index:2].mean().item()
+                mean_y = polygon[1:index:2].mean().item()
+                centers.append((mean_x, mean_y))
+            centers = {i: c for i, c in enumerate(centers)}
+
+            if self.seq_order == 'lr':
+                centers = sorted(centers.items(), key=lambda x: x[1][0])
+            elif self.seq_order == 'rl':
+                centers = sorted(centers.items(), key=lambda x: x[1][0], reverse=True)
+            elif self.seq_order == 'tb':
+                centers = sorted(centers.items(), key=lambda x: x[1][1])
+            elif self.seq_order == 'bt':
+                centers = sorted(centers.items(), key=lambda x: x[1][1], reverse=True)
+            elif self.seq_order == 'sl':
+                centers = {i: area for i, area in enumerate(target['area'])}
+                centers = sorted(centers.items(), key=lambda x: x[1])
+            elif self.seq_order == 'ls':
+                centers = {i: area for i, area in enumerate(target['area'])}
+                centers = sorted(centers.items(), key=lambda x: x[1], reverse=True)
+
+            for i, _ in centers:
+                polygon = target['boxes'][i]
+                for x, y in polygon.view(-1, 2):
+                    if x == -1:
+                        break
+                    token = torch.zeros(256)
+                    token[2 + CLASSES['<point>']] = 1
+                    token[0] = x
+                    token[1] = y
+                    sequence.append(token)
+                end_polygon = torch.zeros(256)
+                end_polygon[2 + CLASSES['<end-of-polygon>']] = 1
+                sequence.append(end_polygon)
+
+        end_computation = torch.zeros(256)
+        end_computation[2 + CLASSES['<end-of-computation>']] = 1
+        sequence.append(end_computation)
+
+        sequence = torch.stack(sequence)
+
+        target['sequence'] = sequence
+        return img, target
+
+
 class CrowdAiDataset(torch.utils.data.Dataset):
 
-    std_transforms = T.Compose([
-        ToTensor(),
-        # Resize((256, 256)),
-        # Hue(prob=0.1),
-        # RandomHorizontalFlip(prob=0.4),
-        # RandomVerticalFlip(prob=0.4),
-        # AddGaussianNoise(prob=0.1)
-    ])
-
-    val_transform = T.Compose([ToTensor()])
-
-    def __init__(self, dataset_path, image_set='train', transform=None, mask_rcnn=False):
+    def __init__(self, dataset_path, image_set='train', transform=None, mask_rcnn=False, seq_order='lr'):
         assert isinstance(dataset_path, str)
         assert image_set in ('train', 'val', 'test')
 
+        std_transforms = T.Compose([
+            ToTensor(),
+            # Resize((256, 256)),
+            # Hue(prob=0.1),
+            # RandomHorizontalFlip(prob=0.4),
+            # RandomVerticalFlip(prob=0.4),
+            # AddGaussianNoise(prob=0.1)
+            GetSentence(seq_order=seq_order)
+        ])
+
+        val_transform = T.Compose([ToTensor()])
+
         print("[CrowdAI DATASET] Initializing CrowdAI dataset")
         self.dataset_path = dataset_path
-        self.transform = transform if transform is not None else self.std_transforms
+        self.transform = transform if transform is not None else std_transforms
         self.mask_rcnn = mask_rcnn
         self.image_set = image_set
         self.home_folder = join(dataset_path, image_set)
+        self.seq_order = seq_order
 
         if 'train' not in image_set:
-            self.transform = self.val_transform
+            self.transform = val_transform
 
         # self.df_ann = pd.read_pickle(join(self.home_folder, 'annotations.pkl'))
         # self.df_images = pd.read_pickle(join(self.home_folder, 'images.pkl'))
 
         self.df_ann = pd.read_pickle(join(self.home_folder, 'annotations_test.pkl'))
         self.df_images = pd.read_pickle(join(self.home_folder, 'images_test.pkl'))
-
-        self.max_coords = max(self.df_ann.apply(lambda x: len(x['segmentation'][0]), axis=1))
-        print("self.max_coords")
-        print(self.max_coords)
 
         # self.df_ann.loc[self.df_ann['image_id'] == 54062].to_pickle(join(self.home_folder, 'annotations_test.pkl'))
         # self.df_images.loc[self.df_images['file_name'] == '000000054062.jpg'].to_pickle(join(self.home_folder, 'images_test.pkl'))
@@ -277,11 +349,6 @@ class CrowdAiDataset(torch.utils.data.Dataset):
 
         row = self.df_images.iloc[index]
 
-        print("----------------------------------------")
-        print("self.df_images\n")
-        print(row)
-        print("----------------------------------------")
-
         img_path = str(row['file_name'])
         img_id = int(row['id'])
         w, h = int(row['width']), int(row['height'])
@@ -297,30 +364,14 @@ class CrowdAiDataset(torch.utils.data.Dataset):
         annotations = self.df_ann.loc[self.df_ann['image_id'] == img_id]
 
         points = [torch.tensor(object, dtype=torch.float32).squeeze(0) for object in list(annotations['segmentation'])]
-        points = torch.stack([torch.cat([object, torch.full([self.max_coords - len(object)], -1)]) for object in points])
-        points = points.view((points.shape[0], -1, 2))
+        max_lenght = max([len(i) for i in points])
 
-        mask_x = torch.where(points[:, :, 0] > 0, 1, 0)
-        mask_y = torch.where(points[:, :, 1] > 0, 1, 0)
+        for seq in points:
+            seq[::2] = seq[::2] / w
+            seq[1::2] = seq[1::2] / h
 
-        points[:, :, 0] = points[:, :, 0][mask_x == 1] / w
-        print(points)
-        exit(0)
-
-        print("----------------------------------------")
-        print("annotations\n")
-        print(annotations.iloc[0])
-        print("----------------------------------------")
-
-        print("----------------------------------------")
-        print("points\n")
-        print(points.shape)
-        print(points)
-        print("----------------------------------------")
-
-        exit(0)
-
-
+        points = torch.stack([torch.cat([object, torch.full([max_lenght - len(object)], -1)]) for object in points])
+        # points = points.view((points.shape[0], -1, 2))
 
         if self.mask_rcnn:
             raise Exception("[CrowdAI Dataset] Loader not ready for MASK R-CNN")
@@ -338,11 +389,11 @@ class CrowdAiDataset(torch.utils.data.Dataset):
             # }
         else:
             target = {
-                'boxes': torch.tensor(gate_coord, dtype=torch.float32),
-                'labels': torch.tensor([0 for _ in range(len(bbox_coord))], dtype=torch.int64),
+                'boxes': points,
+                'labels': torch.tensor([0 for _ in range(points.shape[0])], dtype=torch.int64),
                 'image_id': torch.tensor(img_id, dtype=torch.int64),
-                'area': torch.tensor(areas, dtype=torch.float32),
-                'iscrowd': torch.tensor([0 for _ in range(len(bbox_coord))], dtype=torch.int64),
+                'area': torch.tensor(list(annotations['area']), dtype=torch.float32),
+                'iscrowd': torch.tensor([0 for _ in range(points.shape[0])], dtype=torch.int64),
                 'orig_size': torch.tensor(img_size, dtype=torch.int64),
                 'size': torch.tensor(img_size, dtype=torch.int64),
                 'isrelative': torch.tensor([True], dtype=torch.bool)
@@ -375,20 +426,21 @@ if __name__ == '__main__':
 
     plt.imshow(img.cpu().permute(1, 2, 0))
     h, w = target['size']
-    bnd_box = target['boxes']
+    sequence = target['sequence']
     # gates = target['gates']
     # masks = target['masks']
-    for box in bnd_box:
-        # plt.scatter([box[0], box[2]], [box[1], box[3]])
-        # plt.scatter([box[2]*w, box[4]*w, box[6]*w], [box[3]*h, box[5]*h, box[7]*h])
-        # plt.scatter([box[0]*w], [box[1]*h])
-        plt.scatter([box[0]*w], [box[1]*h], label='0')
-        plt.scatter([box[2]*w], [box[3]*h], label='1')
-        plt.scatter([box[4]*w], [box[5]*h], label='2')
-        plt.scatter([box[6]*w], [box[7]*h], label='3')
+    x, y = [], []
+    for token in sequence:
+        if token[2 + CLASSES['<point>']]:
+            x.append(token[0].item() * w)
+            y.append(token[1].item() * h)
+        else:
+            if len(x) > 0:
+                plt.scatter(x, y)
+            x, y = [], []
 
     plt.legend()
-    plt.title(target['image_id'].item())
+    plt.title(torch.argmax(sequence[:, 2:6], dim=-1).tolist())
     plt.show()
     # for mask in target['masks']:
     #     plt.imshow(mask)
