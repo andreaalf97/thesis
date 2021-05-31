@@ -127,9 +127,9 @@ def get_args_parser():
 
 def main(args):
 
-    # utils.init_distributed_mode(args)
-    print('Not using distributed mode')
-    args.distributed = False
+    utils.init_distributed_mode(args)
+    # print('Not using distributed mode')
+    # args.distributed = False
 
     print("git:\n  {}\n".format(utils.get_sha()))
 
