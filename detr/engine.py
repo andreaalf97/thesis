@@ -84,7 +84,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         for target in targets:
             seq = target['sequence']
             if len(seq) < max_seq_len:
-                end_computation = torch.zeros(256)
+                end_computation = torch.zeros(256).to(device)
                 end_computation[2 + CLASSES['<end-of-computation>']] = 1
                 end_computation = end_computation.repeat(max_seq_len - len(seq), 1)
 
