@@ -234,6 +234,7 @@ class Hue(object):
 
 class GetSentence(object):
     def __init__(self, seq_order='lr'):
+        assert seq_order in ['lr', 'rl', 'tb', 'bt', 'sl', 'ls'], "Not a valid sequence order"
         self.seq_order = seq_order
 
     def __call__(self, sample):
@@ -244,49 +245,46 @@ class GetSentence(object):
         start_token[2 + CLASSES['<start>']] = 1
         sequence.append(start_token)
 
-        if self.seq_order == 'random':
-            raise Exception("Not ready for random sequence order")
-        else:
-            centers = []
-            for polygon in target['boxes']:
-                index = len(polygon)
-                for i, value in enumerate(polygon):
-                    if value == -1:
-                        index = i
-                        break
-                mean_x = polygon[:index:2].mean().item()
-                mean_y = polygon[1:index:2].mean().item()
-                centers.append((mean_x, mean_y))
-            centers = {i: c for i, c in enumerate(centers)}
+        centers = []
+        for polygon in target['boxes']:
+            index = len(polygon)
+            for i, value in enumerate(polygon):
+                if value == -1:
+                    index = i
+                    break
+            mean_x = polygon[:index:2].mean().item()
+            mean_y = polygon[1:index:2].mean().item()
+            centers.append((mean_x, mean_y))
+        centers = {i: c for i, c in enumerate(centers)}
 
-            if self.seq_order == 'lr':
-                centers = sorted(centers.items(), key=lambda x: x[1][0])
-            elif self.seq_order == 'rl':
-                centers = sorted(centers.items(), key=lambda x: x[1][0], reverse=True)
-            elif self.seq_order == 'tb':
-                centers = sorted(centers.items(), key=lambda x: x[1][1])
-            elif self.seq_order == 'bt':
-                centers = sorted(centers.items(), key=lambda x: x[1][1], reverse=True)
-            elif self.seq_order == 'sl':
-                centers = {i: area for i, area in enumerate(target['area'])}
-                centers = sorted(centers.items(), key=lambda x: x[1])
-            elif self.seq_order == 'ls':
-                centers = {i: area for i, area in enumerate(target['area'])}
-                centers = sorted(centers.items(), key=lambda x: x[1], reverse=True)
+        if self.seq_order == 'lr':
+            centers = sorted(centers.items(), key=lambda x: x[1][0])
+        elif self.seq_order == 'rl':
+            centers = sorted(centers.items(), key=lambda x: x[1][0], reverse=True)
+        elif self.seq_order == 'tb':
+            centers = sorted(centers.items(), key=lambda x: x[1][1])
+        elif self.seq_order == 'bt':
+            centers = sorted(centers.items(), key=lambda x: x[1][1], reverse=True)
+        elif self.seq_order == 'sl':
+            centers = {i: area for i, area in enumerate(target['area'])}
+            centers = sorted(centers.items(), key=lambda x: x[1])
+        elif self.seq_order == 'ls':
+            centers = {i: area for i, area in enumerate(target['area'])}
+            centers = sorted(centers.items(), key=lambda x: x[1], reverse=True)
 
-            for i, _ in centers:
-                polygon = target['boxes'][i]
-                for x, y in polygon.view(-1, 2):
-                    if x == -1:
-                        break
-                    token = torch.zeros(256)
-                    token[2 + CLASSES['<point>']] = 1
-                    token[0] = x
-                    token[1] = y
-                    sequence.append(token)
-                end_polygon = torch.zeros(256)
-                end_polygon[2 + CLASSES['<end-of-polygon>']] = 1
-                sequence.append(end_polygon)
+        for i, _ in centers:
+            polygon = target['boxes'][i]
+            for x, y in polygon.view(-1, 2):
+                if x == -1:
+                    break
+                token = torch.zeros(256)
+                token[2 + CLASSES['<point>']] = 1
+                token[0] = x
+                token[1] = y
+                sequence.append(token)
+            end_polygon = torch.zeros(256)
+            end_polygon[2 + CLASSES['<end-of-polygon>']] = 1
+            sequence.append(end_polygon)
 
         end_computation = torch.zeros(256)
         end_computation[2 + CLASSES['<end-of-computation>']] = 1
@@ -300,9 +298,10 @@ class GetSentence(object):
 
 class CrowdAiDataset(torch.utils.data.Dataset):
 
-    def __init__(self, dataset_path, image_set='train', transform=None, mask_rcnn=False, seq_order='lr'):
+    def __init__(self, dataset_path, image_set='train', transform=None, mask_rcnn=False, seq_order='lr', area_threshold=15):
         assert isinstance(dataset_path, str)
         assert image_set in ('train', 'val', 'test')
+        assert area_threshold > 0, "Area threshold must be a positive number"
 
         std_transforms = T.Compose([
             ToTensor(),
@@ -323,6 +322,7 @@ class CrowdAiDataset(torch.utils.data.Dataset):
         self.image_set = image_set
         self.home_folder = join(dataset_path, image_set)
         self.seq_order = seq_order
+        self.area_threshold = area_threshold
 
         if 'train' not in image_set:
             self.transform = val_transform
@@ -330,8 +330,8 @@ class CrowdAiDataset(torch.utils.data.Dataset):
         # self.df_ann = pd.read_pickle(join(self.home_folder, 'annotations.pkl'))
         # self.df_images = pd.read_pickle(join(self.home_folder, 'images.pkl'))
 
-        self.df_ann = pd.read_pickle(join(self.home_folder, 'annotations_test.pkl'))
-        self.df_images = pd.read_pickle(join(self.home_folder, 'images_test.pkl'))
+        self.df_ann = pd.read_pickle(join(self.home_folder, 'annotations.pkl'))
+        self.df_images = pd.read_pickle(join(self.home_folder, 'images.pkl'))
 
         # self.df_ann.loc[self.df_ann['image_id'] == 54062].to_pickle(join(self.home_folder, 'annotations_test.pkl'))
         # self.df_images.loc[self.df_images['file_name'] == '000000054062.jpg'].to_pickle(join(self.home_folder, 'images_test.pkl'))
@@ -363,7 +363,12 @@ class CrowdAiDataset(torch.utils.data.Dataset):
 
         annotations = self.df_ann.loc[self.df_ann['image_id'] == img_id]
 
-        points = [torch.tensor(object, dtype=torch.float32).squeeze(0) for object in list(annotations['segmentation'])]
+        points, areas = [], []
+        for object, area in zip(list(annotations['segmentation']), list(annotations['area'])):
+            if area > self.area_threshold:
+                points.append(torch.tensor(object, dtype=torch.float32).squeeze(0))
+                areas.append(area)
+        # points = [torch.tensor(object, dtype=torch.float32).squeeze(0) for object in list(annotations['segmentation'])]
         max_lenght = max([len(i) for i in points])
 
         for seq in points:
@@ -392,7 +397,7 @@ class CrowdAiDataset(torch.utils.data.Dataset):
                 'boxes': points,
                 'labels': torch.tensor([0 for _ in range(points.shape[0])], dtype=torch.int64),
                 'image_id': torch.tensor(img_id, dtype=torch.int64),
-                'area': torch.tensor(list(annotations['area']), dtype=torch.float32),
+                'area': torch.tensor(areas, dtype=torch.float32),
                 'iscrowd': torch.tensor([0 for _ in range(points.shape[0])], dtype=torch.int64),
                 'orig_size': torch.tensor(img_size, dtype=torch.int64),
                 'size': torch.tensor(img_size, dtype=torch.int64),
@@ -417,7 +422,8 @@ if __name__ == '__main__':
     ds = CrowdAiDataset(
         "/home/andreaalf/Documents/thesis/datasets/crowdai",
         mask_rcnn=False,
-        image_set='train'
+        image_set='train',
+        seq_order='rl'
     )
 
     index = random.randint(0, len(ds)-1)
@@ -430,18 +436,23 @@ if __name__ == '__main__':
     # gates = target['gates']
     # masks = target['masks']
     x, y = [], []
+    i = 1
     for token in sequence:
         if token[2 + CLASSES['<point>']]:
             x.append(token[0].item() * w)
             y.append(token[1].item() * h)
         else:
             if len(x) > 0:
-                plt.scatter(x, y)
+                plt.scatter(x, y, label=i)
+                i += 1
             x, y = [], []
 
     plt.legend()
-    plt.title(torch.argmax(sequence[:, 2:6], dim=-1).tolist())
+    # plt.title(torch.argmax(sequence[:, 2:6], dim=-1).tolist())
+    plt.title(target['labels'].tolist())
     plt.show()
+
+    print(target['boxes'].tolist())
     # for mask in target['masks']:
     #     plt.imshow(mask)
     #     plt.show()

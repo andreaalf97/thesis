@@ -451,7 +451,7 @@ def build(args):
         # for panoptic, we just add a num_classes that is large enough to hold
         # max_obj_id + 1, but the exact value doesn't really matter
         num_classes = 250
-    if args.dataset_file == "toy_setting" or args.dataset_file == "real_gates":
+    if args.dataset_file in ["toy_setting", "real_gates", "crowdai"]:
         num_classes = 4
     device = torch.device(args.device)
 
