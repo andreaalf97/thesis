@@ -79,22 +79,9 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
 
         max_seq_len = max([len(target['sequence']) for target in targets])
 
-        # Here we pad every sentence with the <end-of-computation> token
-        sequences = []
-        for target in targets:
-            seq = target['sequence']
-            if len(seq) < max_seq_len:
-                end_computation = torch.zeros(256).to(device)
-                end_computation[2 + CLASSES['<end-of-computation>']] = 1
-                end_computation = end_computation.repeat(max_seq_len - len(seq), 1)
-                sequences.append(torch.cat([seq, end_computation], dim=0))
-            else:
-                sequences.append(seq)
-
-        sequences = torch.stack(sequences)
         outputs = model(
             samples,
-            tgt=sequences
+            tgt=torch.stack([target['sequence'] for target in targets])
         )
 
         # if index % 10 == 0:

@@ -269,9 +269,14 @@ def get_sha():
 
 def collate_fn(batch):
     batch = list(zip(*batch))
-    print(type(batch[1]))
-    print(len(batch[1]))
-    exit(0)
+    max_len = max([len(target['sequence']) for target in batch[1]])
+    for target in batch[1]:
+        seq = target['sequence']
+        if len(seq) < max_len:
+            end_computation = torch.zeros(256)
+            end_computation[5] = 1
+            end_computation = end_computation.repeat(max_len - len(seq), 1)
+            target['sequence'] = torch.cat([seq, end_computation], dim=0)
     batch[0] = nested_tensor_from_tensor_list(batch[0])
     return tuple(batch)
 
