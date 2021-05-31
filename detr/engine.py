@@ -89,14 +89,15 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
                 end_computation = torch.zeros(256).to(device)
                 end_computation[2 + CLASSES['<end-of-computation>']] = 1
                 end_computation = end_computation.repeat(max_seq_len - len(seq), 1)
-
                 sequences.append(torch.cat([seq, end_computation], dim=0))
+            else:
+                sequences.append(seq)
 
         sequences = torch.stack(sequences)
         print("-----")
         print([target['boxes'].shape for target in targets])
         print(sequences.shape)
-        print(sequences[:, :6])
+        print(sequences[:, :, :6])
         exit(0)
 
         outputs = model(
