@@ -21,8 +21,14 @@ from shapely.geometry import MultiPoint
 from shapely.errors import TopologicalError
 import pandas as pd
 from os.path import join
-import models
 
+
+CLASSES = {
+    "<start>": 0,
+    "<point>": 1,
+    "<end-of-polygon>": 2,
+    "<end-of-computation>": 3
+}
 
 def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
                     data_loader: Iterable, optimizer: torch.optim.Optimizer,
@@ -79,7 +85,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
             seq = target['sequence']
             if len(seq) < max_seq_len:
                 end_computation = torch.zeros(256)
-                end_computation[2 + models.CLASSES['<end-of-computation>']] = 1
+                end_computation[2 + CLASSES['<end-of-computation>']] = 1
                 end_computation = end_computation.repeat(max_seq_len - len(seq), 1)
 
                 sequences.append(torch.cat([seq, end_computation], dim=0))
