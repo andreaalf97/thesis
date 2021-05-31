@@ -21,7 +21,7 @@ from shapely.geometry import MultiPoint
 from shapely.errors import TopologicalError
 import pandas as pd
 from os.path import join
-import random
+import models
 
 
 def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
@@ -70,9 +70,23 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
             aux_outputs --> List of length 5 (repetitions of decoder - 1)
                 Each aux_output[i] is again a DICT with keys ['pred_logits', 'pred_boxes']
         """
+
+        max_seq_len = max([len(target['sequence']) for target in targets])
+
+        # Here we pad every sentence with the <end-of-computation> token
+        sequences = []
+        for target in targets:
+            seq = target['sequence']
+            if len(seq) < max_seq_len:
+                end_computation = torch.zeros(256)
+                end_computation[2 + models.CLASSES['<end-of-computation>']] = 1
+                end_computation = end_computation.repeat(max_seq_len - len(seq), 1)
+
+                sequences.append(torch.cat([seq, end_computation], dim=0))
+
         outputs = model(
             samples,
-            tgt=torch.stack([target['sequence'] for target in targets])
+            tgt=torch.stack(sequences)
         )
 
         # if index % 10 == 0:

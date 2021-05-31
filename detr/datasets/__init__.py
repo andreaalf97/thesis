@@ -8,6 +8,13 @@ from .real_gates import RealGatesDS
 from .crowdai import CrowdAiDataset
 
 
+CLASSES = {
+    "<start>": 0,
+    "<point>": 1,
+    "<end-of-polygon>": 2,
+    "<end-of-computation>": 3
+}
+
 def get_coco_api_from_dataset(dataset):
     for _ in range(10):
         # if isinstance(dataset, torchvision.datasets.CocoDetection):
