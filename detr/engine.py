@@ -90,9 +90,13 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
 
                 sequences.append(torch.cat([seq, end_computation], dim=0))
 
+        sequences = torch.stack(sequences)
+        print(sequences[:, :6])
+        exit(0)
+
         outputs = model(
             samples,
-            tgt=torch.stack(sequences)
+            tgt=sequences
         )
 
         # if index % 10 == 0:
