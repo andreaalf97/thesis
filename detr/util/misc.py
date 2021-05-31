@@ -268,7 +268,7 @@ def get_sha():
 
 
 def collate_fn(batch):
-    print(batch*)
+    print(*batch)
     exit(0)
     batch = list(zip(*batch))
     batch[0] = nested_tensor_from_tensor_list(batch[0])
