@@ -83,8 +83,6 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         sequences = []
         for target in targets:
             seq = target['sequence']
-            print("seq", seq.shape)
-            print("seq", seq[:, :6])
             if len(seq) < max_seq_len:
                 end_computation = torch.zeros(256).to(device)
                 end_computation[2 + CLASSES['<end-of-computation>']] = 1
@@ -94,12 +92,6 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
                 sequences.append(seq)
 
         sequences = torch.stack(sequences)
-        print("-----")
-        print([target['boxes'].shape for target in targets])
-        print(sequences.shape)
-        print(sequences[:, :, :6])
-        exit(0)
-
         outputs = model(
             samples,
             tgt=sequences
