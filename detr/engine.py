@@ -91,6 +91,8 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
                 sequences.append(torch.cat([seq, end_computation], dim=0))
 
         sequences = torch.stack(sequences)
+        print([target['boxes'].shape for target in targets])
+        print(sequences.shape)
         print(sequences[:, :6])
         exit(0)
 
