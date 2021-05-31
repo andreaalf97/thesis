@@ -83,6 +83,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         sequences = []
         for target in targets:
             seq = target['sequence']
+            print("seq", seq.shape)
             print("seq", seq[:, :6])
             if len(seq) < max_seq_len:
                 end_computation = torch.zeros(256).to(device)
