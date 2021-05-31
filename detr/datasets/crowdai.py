@@ -330,8 +330,11 @@ class CrowdAiDataset(torch.utils.data.Dataset):
         # self.df_ann = pd.read_pickle(join(self.home_folder, 'annotations.pkl'))
         # self.df_images = pd.read_pickle(join(self.home_folder, 'images.pkl'))
 
+        print("[CrowdAI DATASET] Loading pickle files..")
         self.df_ann = pd.read_pickle(join(self.home_folder, 'annotations.pkl'))
+        print("[CrowdAI DATASET] Loaded annotations")
         self.df_images = pd.read_pickle(join(self.home_folder, 'images.pkl'))
+        print("[CrowdAI DATASET] Loaded images")
 
         # self.df_ann.loc[self.df_ann['image_id'] == 54062].to_pickle(join(self.home_folder, 'annotations_test.pkl'))
         # self.df_images.loc[self.df_images['file_name'] == '000000054062.jpg'].to_pickle(join(self.home_folder, 'images_test.pkl'))
