@@ -127,7 +127,7 @@ def get_args_parser():
 
 def main(args):
 
-    utils.init_distributed_mode(args)
+    # utils.init_distributed_mode(args)
     # print('Not using distributed mode')
     # args.distributed = False
 
@@ -158,9 +158,9 @@ def main(args):
     model.to(device)
 
     model_without_ddp = model
-    if args.distributed:
-        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
-        model_without_ddp = model.module
+    # if args.distributed:
+    #     model_without_ddp = model.module
+    model = torch.nn.parallel.DataParallel(model, device_ids=list(range(2)))
     n_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print('number of params:', n_parameters)
 
