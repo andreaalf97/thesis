@@ -456,6 +456,7 @@ if __name__ == '__main__':
         # plt.title(torch.argmax(sequence[:, 2:6], dim=-1).tolist())
         plt.title(target['area'].tolist())
         plt.savefig(f"/home/nfs/andreaalfieria/sample_images/sample{found}.png")
+        plt.show()
         print("Saved image", found)
         found += 1
 
