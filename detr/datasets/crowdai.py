@@ -423,7 +423,7 @@ if __name__ == '__main__':
     # )
 
     ds = CrowdAiDataset(
-        "/home/andreaalf/Documents/thesis/datasets/crowdai",
+        "/tudelft.net/staff-bulk/ewi/insy/VisionLab/yanconglin/dataset/CrowAI/",
         mask_rcnn=False,
         image_set='train',
         seq_order='rl'
