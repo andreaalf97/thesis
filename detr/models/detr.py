@@ -57,7 +57,8 @@ class DETR(nn.Module):
                                 dictionaries containing the two above keys for each decoder layer.
         """
         samples = samples.to(self.class_embed.weight.device)
-        tgt = tgt.to(self.class_embed.weight.device) if tgt is not None else None
+        if tgt is not None:
+            tgt = tgt.to(self.class_embed.weight.device)
 
         if isinstance(samples, (list, torch.Tensor)):
             samples = nested_tensor_from_tensor_list(samples)
