@@ -431,29 +431,33 @@ if __name__ == '__main__':
 
     index = random.randint(0, len(ds)-1)
     # index = 0
-    img, target = ds[index]
+    found = 1
+    for img, target in ds:
+        if found > 20:
+            break
+        plt.imshow(img.cpu().permute(1, 2, 0))
+        h, w = target['size']
+        sequence = target['sequence']
+        # gates = target['gates']
+        # masks = target['masks']
+        x, y = [], []
+        i = 1
+        for token in sequence:
+            if token[2 + CLASSES['<point>']]:
+                x.append(token[0].item() * w)
+                y.append(token[1].item() * h)
+            else:
+                if len(x) > 0:
+                    plt.scatter(x, y, label=i)
+                    i += 1
+                x, y = [], []
 
-    plt.imshow(img.cpu().permute(1, 2, 0))
-    h, w = target['size']
-    sequence = target['sequence']
-    # gates = target['gates']
-    # masks = target['masks']
-    x, y = [], []
-    i = 1
-    for token in sequence:
-        if token[2 + CLASSES['<point>']]:
-            x.append(token[0].item() * w)
-            y.append(token[1].item() * h)
-        else:
-            if len(x) > 0:
-                plt.scatter(x, y, label=i)
-                i += 1
-            x, y = [], []
-
-    plt.legend()
-    # plt.title(torch.argmax(sequence[:, 2:6], dim=-1).tolist())
-    plt.title(target['area'].tolist())
-    plt.savefig("/home/nfs/andreaalfieria/sample_images")
+        plt.legend()
+        # plt.title(torch.argmax(sequence[:, 2:6], dim=-1).tolist())
+        plt.title(target['area'].tolist())
+        plt.savefig(f"/home/nfs/andreaalfieria/sample_images/sample{found}.png")
+        print("Saved image", found)
+        found += 1
 
     # for mask in target['masks']:
     #     plt.imshow(mask)
