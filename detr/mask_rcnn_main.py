@@ -96,7 +96,7 @@ if __name__ == '__main__':
     # path = "/home/andreaalf/Documents/thesis/datasets/gate_samples"
     # pkl_path = "/home/andreaalf/Documents/thesis/datasets/normalized_train_8000imgs.pkl"
 
-    resume_from = ""
+    resume_from = "/tudelft.net/staff-bulk/ewi/insy/VisionLab/students/andreaalf/exp5/R_checkpoint199.pth"
     # resume_from = "/home/nfs/andreaalfieria/thesis/detr/tmp/maskrcnn_STD_150epochs_checkpoint.pth"
 
     #############################################
@@ -109,7 +109,7 @@ if __name__ == '__main__':
     # eval_pkl_path = "/home/andreaalf/Documents/thesis/datasets/normalized_test_2000imgs.pkl"
     save_results_to = "/home/nfs/andreaalfieria/thesis/detr/tmp/EVAL_maskrcnn_STD_300epochs.pkl"
 
-    seed = 43
+    seed = 55
     seed = seed * 2 if eval_model != "" else seed
     torch.manual_seed(seed)
     np.random.seed(seed)
@@ -130,9 +130,9 @@ if __name__ == '__main__':
 
     save_model_to = "/tudelft.net/staff-bulk/ewi/insy/VisionLab/students/andreaalf/exp5/R.pth"
     # save_model_to = ""
-    num_epochs = 300
+    num_epochs = 100
     batch_size = 8
-    drop_lr_after = 200
+    drop_lr_after = 1
     learning_rate = 0.005
     # learning_rate = 1e-4
 
@@ -233,10 +233,10 @@ if __name__ == '__main__':
         print(f"{end-start}s for this epoch")
         ex_times.append(end-start)
 
-        if save_model_to != "" and ((epoch+1) % 50 == 0):
-            print(f"Saving backup of epoch {epoch} at {save_model_to.replace('.pth', f'_checkpoint{epoch}.pth')}")
-            torch.save(model.state_dict(), save_model_to.replace('.pth', f'_checkpoint{epoch}.pth'))
-            print("SAVED MODEL at", save_model_to.replace('.pth', f'_checkpoint{epoch}.pth'))
+        if save_model_to != "" and ((epoch+1) % 25 == 0):
+            print(f"Saving backup of epoch {epoch+200} at {save_model_to.replace('.pth', f'_checkpoint{epoch+200}.pth')}")
+            torch.save(model.state_dict(), save_model_to.replace('.pth', f'_checkpoint{epoch+200}.pth'))
+            print("SAVED MODEL at", save_model_to.replace('.pth', f'_checkpoint{epoch+200}.pth'))
 
     print("FINISHED TRAINING")
     print("Average training time: %.4f s/epoch" % (sum(ex_times)/num_epochs))
