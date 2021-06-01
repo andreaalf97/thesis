@@ -453,7 +453,7 @@ if __name__ == '__main__':
     plt.legend()
     # plt.title(torch.argmax(sequence[:, 2:6], dim=-1).tolist())
     plt.title(target['area'].tolist())
-    plt.show()
+    plt.savefig("/home/nfs/andreaalfieria/sample_images")
 
     # for mask in target['masks']:
     #     plt.imshow(mask)
