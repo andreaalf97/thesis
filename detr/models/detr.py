@@ -56,8 +56,8 @@ class DETR(nn.Module):
                - "aux_outputs": Optional, only returned when auxiliary losses are activated. It is a list of
                                 dictionaries containing the two above keys for each decoder layer.
         """
-        samples = samples.to(self.device)
-        tgt = tgt.to(self.device) if tgt is not None else None
+        samples = samples.to(self.class_embed.device)
+        tgt = tgt.to(self.class_embed.device) if tgt is not None else None
 
         if isinstance(samples, (list, torch.Tensor)):
             samples = nested_tensor_from_tensor_list(samples)
