@@ -81,7 +81,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
 
         outputs = model(
             samples,
-            tgt=torch.stack([target['sequence'] for target in targets])
+            torch.stack([target['sequence'] for target in targets])
         )
 
         # if index % 10 == 0:
