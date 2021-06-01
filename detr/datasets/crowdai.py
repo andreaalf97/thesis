@@ -452,10 +452,9 @@ if __name__ == '__main__':
 
     plt.legend()
     # plt.title(torch.argmax(sequence[:, 2:6], dim=-1).tolist())
-    plt.title(target['labels'].tolist())
+    plt.title(target['area'].tolist())
     plt.show()
 
-    print(target['boxes'].tolist())
     # for mask in target['masks']:
     #     plt.imshow(mask)
     #     plt.show()
