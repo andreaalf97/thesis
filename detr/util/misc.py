@@ -269,8 +269,6 @@ def get_sha():
 
 def collate_fn(batch):
     batch = list(zip(*batch))
-    print(batch)
-    exit(0)
     max_len = max([len(target['sequence']) for target in batch[1]])
     for target in batch[1]:
         seq = target['sequence']
