@@ -103,11 +103,13 @@ if __name__ == '__main__':
     # EVALUATION PARAMETERS
     # Comment this out for no evaluation
     # eval_model = "/home/nfs/andreaalfieria/thesis/detr/tmp/maskrcnn_STD_300epochs.pth"
-    eval_model = ""
+    eval_model = "/tudelft.net/staff-bulk/ewi/insy/VisionLab/students/andreaalf/exp5/R.pth"
+    # eval_model = ""
     # eval_model = "/home/andreaalf/Documents/thesis/detr/results/baseline_comparison/maskrcnn_uniform8000_100epochs.pth"
     eval_pkl_path = "/home/nfs/andreaalfieria/STD_TEST_basement.pkl"
     # eval_pkl_path = "/home/andreaalf/Documents/thesis/datasets/normalized_test_2000imgs.pkl"
-    save_results_to = "/home/nfs/andreaalfieria/thesis/detr/tmp/EVAL_maskrcnn_STD_300epochs.pkl"
+    # save_results_to = "/home/nfs/andreaalfieria/thesis/detr/tmp/EVAL_maskrcnn_STD_300epochs.pkl"
+    save_results_to = "/tudelft.net/staff-bulk/ewi/insy/VisionLab/students/andreaalf/exp5/EVAL_R.pkl"
 
     seed = 55
     seed = seed * 2 if eval_model != "" else seed
@@ -120,7 +122,7 @@ if __name__ == '__main__':
             model=get_instance_segmentation_model(num_classes),
             pkl_path=eval_pkl_path,
             pretrained_model=eval_model,
-            ds_func=get_mask_rcnn_dataset,
+            ds_func=get_toy_setting_dataset if path == 'toy_setting' else get_mask_rcnn_dataset,
             ds_path=path,
             save_results_to=save_results_to,
             device=device

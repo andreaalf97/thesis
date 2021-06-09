@@ -39,4 +39,4 @@ def get_mask_rcnn_dataset(path: str, pkl_path: str, image_set='train'):
 
 
 def get_toy_setting_dataset():
-    return TSDataset(256, 256, num_gates=6, black_and_white=True, no_gate_chance=0.0, stroke=-1, num_corners=4, mask=True, clamp_gates=True)
+    return TSDataset(256, 256, num_gates=8, black_and_white=True, no_gate_chance=0.0, stroke=-1, num_corners=4, mask=True, clamp_gates=True)

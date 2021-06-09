@@ -64,11 +64,15 @@ def evaluate(model, pkl_path, pretrained_model, ds_func, ds_path, save_results_t
     print("Saving results at", save_results_to)
     print("-----\n")
 
-    ds = ds_func(
-        ds_path,
-        pkl_path=pkl_path,
-        image_set='val'
-    )
+    # For REAL GATES
+    # ds = ds_func(
+    #     ds_path,
+    #     pkl_path=pkl_path,
+    #     image_set='val'
+    # )
+
+    # For TOY SETTING
+    ds = ds_func()
 
     data_loader = torch.utils.data.DataLoader(
         ds, batch_size=8, shuffle=False, num_workers=0,
@@ -81,6 +85,11 @@ def evaluate(model, pkl_path, pretrained_model, ds_func, ds_path, save_results_t
         'confidence': [],
         'outcome': [],
         'bbox': []
+    })
+    image_objects = pd.DataFrame({
+        'img_id': [],
+        'num_objects': [],
+        'gates': []
     })
 
     for iteration, (images, targets) in enumerate(data_loader):
@@ -140,6 +149,11 @@ def evaluate(model, pkl_path, pretrained_model, ds_func, ds_path, save_results_t
                 row['bbox'].append(output_dict['boxes'][index].tolist())
 
             results = results.append(pd.DataFrame(row), ignore_index=True)
+            image_objects = image_objects.append(pd.DataFrame({
+                'img_id': [img_id],
+                'num_objects': [len(target['boxes'])],
+                'gates': [target['boxes'].cpu().tolist()]
+            }), ignore_index=True)
 
         print(f"Iteration {iteration} of {len(data_loader)}")
         print(f"Dataframe size {len(results)}\n#####")
@@ -147,3 +161,4 @@ def evaluate(model, pkl_path, pretrained_model, ds_func, ds_path, save_results_t
         #     print(f"Iteration {iteration} of {len(data_loader)}")
     print("SAVING RESULTS TO", save_results_to)
     results.to_pickle(save_results_to)
+    image_objects.to_pickle(save_results_to.replace("EVAL", "DS_INFO"))
