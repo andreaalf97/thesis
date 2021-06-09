@@ -470,31 +470,17 @@ def valid_box(box: torch.Tensor) -> bool:
 
 
 def iou(prediction: torch.Tensor, gt: torch.Tensor) -> float:
+    for i, p in enumerate(prediction):
+        if p[2] > 0.5:
+            break
+    tmp_pred = prediction[:i, :2]
 
-    pred_bl = [prediction[0].item(), prediction[1].item()]
-    pred_tl = [prediction[2].item(), prediction[3].item()]
-    pred_tr = [prediction[4].item(), prediction[5].item()]
-    pred_br = [prediction[6].item(), prediction[7].item()]
-
-    gt_bl = [gt[0].item(), gt[1].item()]
-    gt_tl = [gt[2].item(), gt[3].item()]
-    gt_tr = [gt[4].item(), gt[5].item()]
-    gt_br = [gt[6].item(), gt[7].item()]
+    tmp_gt = gt[:torch.where(gt < -0.5, False, True).sum()].view(-1, 2)
 
     try:
-        pred_poly = MultiPoint([
-            pred_bl,
-            pred_tl,
-            pred_tr,
-            pred_br
-        ]).convex_hull
+        pred_poly = MultiPoint(tmp_pred.tolist()).convex_hull
 
-        gt_poly = MultiPoint([
-            gt_bl,
-            gt_tl,
-            gt_tr,
-            gt_br
-        ]).convex_hull
+        gt_poly = MultiPoint(tmp_gt.tolist()).convex_hull
 
         intersection = pred_poly.intersection(gt_poly).area
         union = pred_poly.area + gt_poly.area - intersection
