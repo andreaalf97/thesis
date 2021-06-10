@@ -20,10 +20,10 @@ class PolyGate:
 
         self.num_corners = num_corners
 
-        self.c_x = random.randint(int(0.20*image_width), int(image_width - (0.20*image_width)))
-        self.c_y = random.randint(int(0.20*image_height), int(image_height - (0.20*image_height)))
+        self.c_x = random.randint(int(0.10*image_width), int(image_width - (0.10*image_width)))
+        self.c_y = random.randint(int(0.10*image_height), int(image_height - (0.10*image_height)))
 
-        radius_perc = random.uniform(0.05, 0.40)
+        radius_perc = random.uniform(0.05, 0.10)
         self.radius = image_height * radius_perc
 
         if num_corners == -1:
@@ -37,7 +37,7 @@ class PolyGate:
             x = self.c_x + self.radius * math.cos(alpha)
             y = self.c_y + self.radius * math.sin(alpha)
             slope = math.tan(alpha) if alpha != math.pi/2 else math.tan(alpha + 0.001)
-            delta_x = random.uniform(0.0, math.sqrt(self.radius)/2)
+            delta_x = random.uniform(0.0, math.sqrt(self.radius)/4)
             delta_y = slope * delta_x
 
             final_x = int(x+delta_x)
@@ -363,13 +363,18 @@ class TSDataset(torch.utils.data.Dataset):
 
 if __name__ == '__main__':
 
-    ds = TSDataset(256, 256, num_gates=5, black_and_white=True, no_gate_chance=0.0, stroke=-1, num_corners=4, mask=False, clamp_gates=False)
+    ds = TSDataset(
+        512, 512,
+        num_gates=20,
+        black_and_white=True,
+        no_gate_chance=0.0,
+        stroke=-1,
+        num_corners=4,
+        mask=False,
+        clamp_gates=True
+    )
 
     for image, target in ds:
         plt.imshow(image.cpu().permute(1, 2, 0))
-
-        print('\n'.join(str(k) + ' --> ' + str(list(target[k].shape)) for k in target))
-
         plt.show()
-
         break
