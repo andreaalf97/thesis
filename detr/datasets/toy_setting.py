@@ -320,10 +320,9 @@ class GetSentence(object):
                 token[:8] = polygon
                 sequence.append(token)
 
-        while len(sequence) < max_lenght:
-            end_computation = torch.zeros(256)
-            end_computation[8 + CLASSES['<end-of-computation>']] = 1
-            sequence.append(end_computation)
+        end_computation = torch.zeros(256)
+        end_computation[8 + CLASSES['<end-of-computation>']] = 1
+        sequence.append(end_computation)
 
         sequence = torch.stack(sequence)
 
