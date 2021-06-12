@@ -98,12 +98,13 @@ class PolyGate:
         return len(self.corners)
 
 
-def get_ts_image(height, width, num_gates=3, no_gate_chance=0.10, black_and_white=True, stroke=-1, num_corners=-1, clamp=True) -> (np.ndarray, list, list):
+def get_ts_image(height, width, num_gates=3, no_gate_chance=0.10, black_and_white=True, stroke=-1, num_corners=-1, clamp=True, fix_gates=False) -> (np.ndarray, list, list):
 
     if random.random() < no_gate_chance:
         num_gates = 0
     else:
-        num_gates = random.randint(1, num_gates)
+        if not fix_gates:
+            num_gates = random.randint(1, num_gates)
 
     img = get_ts_background(height, width, bgr=False, black_white=black_and_white)
 
@@ -379,7 +380,7 @@ class MaskRCNN(object):
 class TSDataset(torch.utils.data.Dataset):
 
     def __init__(self, img_height, img_width, num_gates=3, black_and_white=True,
-                 no_gate_chance=0.0, stroke=-1, num_corners=4, mask=False, clamp_gates=False, seq_order='tb'):
+                 no_gate_chance=0.0, stroke=-1, num_corners=4, mask=False, clamp_gates=False, seq_order='tb', fix_gates=False):
         assert seq_order in ('ls', 'sl', 'lr', 'rl', 'tb', 'bt', 'random'), f"{seq_order} order not implemented for TOY SETTING"
         self.img_height = img_height
         self.img_width = img_width
@@ -390,6 +391,7 @@ class TSDataset(torch.utils.data.Dataset):
         self.num_corners = num_corners
         self.clamp_gates = clamp_gates
         self.seq_order = seq_order
+        self.fix_gates = fix_gates
         if mask:
             self.transform = T.Compose([
                     ToTensor(),
@@ -417,7 +419,8 @@ class TSDataset(torch.utils.data.Dataset):
             black_and_white=self.black_and_white,
             stroke=self.stroke,
             num_corners=self.num_corners,
-            clamp=self.clamp_gates
+            clamp=self.clamp_gates,
+            fix_gates=self.fix_gates
         )
 
         # boxes, labels, image_id, area, iscrowd, orig_size, size
