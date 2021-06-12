@@ -26,10 +26,10 @@ class PolyGate:
 
         self.num_corners = num_corners
 
-        self.c_x = random.randint(int(0.20*image_width), int(image_width - (0.20*image_width)))
-        self.c_y = random.randint(int(0.20*image_height), int(image_height - (0.20*image_height)))
+        self.c_x = random.randint(int(0.10*image_width), int(image_width - (0.10*image_width)))
+        self.c_y = random.randint(int(0.10*image_height), int(image_height - (0.10*image_height)))
 
-        radius_perc = random.uniform(0.05, 0.40)
+        radius_perc = random.uniform(0.05, 0.10)
         self.radius = image_height * radius_perc
 
         if num_corners == -1:
