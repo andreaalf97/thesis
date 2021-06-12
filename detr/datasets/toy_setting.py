@@ -43,7 +43,7 @@ class PolyGate:
             x = self.c_x + self.radius * math.cos(alpha)
             y = self.c_y + self.radius * math.sin(alpha)
             slope = math.tan(alpha) if alpha != math.pi/2 else math.tan(alpha + 0.001)
-            delta_x = random.uniform(0.0, math.sqrt(self.radius)/2)
+            delta_x = random.uniform(0.0, math.sqrt(self.radius)/4)
             delta_y = slope * delta_x
 
             final_x = int(x+delta_x)
