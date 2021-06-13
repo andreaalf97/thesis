@@ -671,6 +671,7 @@ def evaluate_map(model, data_loader_val, device, args):
 
         outputs = model(images, tgt=torch.stack([target['sequence'] for target in targets])[:, 0, :].unsqueeze(1))
 
+        outputs = outputs.to(torch.device('cpu'))
         targets = [{k: v.to(torch.device('cpu')) for k, v in t.items()} for t in targets]
 
         # outputs = {k: v for k, v in outputs.items() if k != 'aux_outputs'}
