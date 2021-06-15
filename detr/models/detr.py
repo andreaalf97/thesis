@@ -35,7 +35,7 @@ class DETR(nn.Module):
         self.transformer = transformer
         hidden_dim = transformer.d_model
         self.class_embed = nn.Linear(hidden_dim, num_classes + 1)
-        self.bbox_embed = MLP(hidden_dim, hidden_dim, 8, 3)
+        self.bbox_embed = MLP(hidden_dim, hidden_dim, 2, 3)
         self.query_embed = nn.Embedding(num_queries, hidden_dim)
         self.input_proj = nn.Conv2d(backbone.num_channels, hidden_dim, kernel_size=1)
         self.backbone = backbone
@@ -169,10 +169,10 @@ class SetCriterion(nn.Module):
         losses = {}
         losses['loss_bbox'] = loss_bbox.sum() / num_boxes
 
-        loss_giou = 1 - torch.diag(box_ops.generalized_box_iou(
-            keypoints_to_bndbox(src_boxes),
-            keypoints_to_bndbox(target_boxes)))
-        losses['loss_giou'] = loss_giou.sum() / num_boxes
+        # loss_giou = 1 - torch.diag(box_ops.generalized_box_iou(
+        #     keypoints_to_bndbox(src_boxes),
+        #     keypoints_to_bndbox(target_boxes)))
+        # losses['loss_giou'] = loss_giou.sum() / num_boxes
 
         return losses
 
