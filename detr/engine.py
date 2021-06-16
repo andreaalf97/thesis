@@ -569,7 +569,7 @@ def match_predictions_optim(pred_logits: torch.Tensor, pred_boxes: torch.Tensor,
                 gt_box.unsqueeze(0),
                 p=1
             )
-            print(iou_score)
+            print(iou_score.item())
             exit(0)
             cost_matrix[i][j] = iou_score.item()
 
