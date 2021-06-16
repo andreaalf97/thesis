@@ -562,6 +562,9 @@ def match_predictions_optim(pred_logits: torch.Tensor, pred_boxes: torch.Tensor,
     cost_matrix = [[0 for _ in range(len(predictions))] for _ in range(len(gt_boxes))]
     for i, gt_box in enumerate(gt_boxes):  # For each GT mask we find the best match
         for j, (pred_box, _, _) in enumerate(predictions):  # For each prediction mask we compare it
+            print(pred_box)
+            print(gt_box)
+            exit(0)
             iou_score = torch.cdist(
                 pred_box,
                 gt_box,
