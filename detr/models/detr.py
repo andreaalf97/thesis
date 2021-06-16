@@ -35,7 +35,7 @@ class DETR(nn.Module):
         self.transformer = transformer
         hidden_dim = transformer.d_model
         self.class_embed = nn.Linear(hidden_dim, num_classes)
-        self.bbox_embed = MLP(hidden_dim, hidden_dim, 8, 3)
+        self.bbox_embed = MLP(hidden_dim, hidden_dim, 2, 3)
         self.query_embed = nn.Embedding(num_queries, hidden_dim)
         self.input_proj = nn.Conv2d(backbone.num_channels, hidden_dim, kernel_size=1)
         self.backbone = backbone
@@ -73,7 +73,7 @@ class DETR(nn.Module):
         if not self.training:
 
             tgt = tgt[:, 0, :].unsqueeze(1)  # During evaluation we only pass the start token and use the predictions
-            fake_tgt = tgt[:, 0, :11].unsqueeze(1).clone()
+            fake_tgt = tgt[:, 0, :5].unsqueeze(1).clone()
 
             src = self.input_proj(src)
             mask = mask
@@ -107,12 +107,12 @@ class DETR(nn.Module):
                 fake_new_tensor = []
                 for i, (batch_class, batch_coord, confidence) in enumerate(zip(pred_class, pred_coord, confidences)):
                     t = torch.zeros(256).to(tgt.device)
-                    fake_t = torch.zeros(11).to(tgt.device)
-                    t[8 + batch_class] = 1
-                    fake_t[8 + batch_class] = confidence
+                    fake_t = torch.zeros(5).to(tgt.device)
+                    t[2 + batch_class] = 1
+                    fake_t[2 + batch_class] = confidence
                     if batch_class == 1:  # <point> class
-                        t[:8] = batch_coord
-                        fake_t[:8] = batch_coord
+                        t[:2] = batch_coord
+                        fake_t[:2] = batch_coord
                     if batch_class == 2:  # <end-of-computation> class
                         ended[i] = True
                     new_tensor.append(t)
@@ -318,15 +318,15 @@ class SetCriterion(nn.Module):
 
         outputs_without_aux = {k: v for k, v in outputs.items() if k != 'aux_outputs'}
 
-        tgt_logits = torch.argmax(torch.stack([target['sequence'][:, 8:11] for target in targets]), dim=2)
+        tgt_logits = torch.argmax(torch.stack([target['sequence'][:, 2:5] for target in targets]), dim=2)
         last_dim = tgt_logits[:, -1]
         tgt_logits = torch.cat([tgt_logits[:, 1:], last_dim.unsqueeze(-1)], dim=1)
 
-        tgt_boxes = torch.stack([target['sequence'][:, :8] for target in targets])
+        tgt_boxes = torch.stack([target['sequence'][:, :2] for target in targets])
         last_dim = tgt_boxes[:, -1, :]
         tgt_boxes = torch.cat([tgt_boxes[:, 1:, :], last_dim.unsqueeze(1)], dim=1)
 
-        condition = torch.where(tgt_logits != 1, 0., 1.).unsqueeze(-1).expand(-1, -1, 8)
+        condition = torch.where(tgt_logits != 1, 0., 1.).unsqueeze(-1).expand(-1, -1, 2)
         # outputs_without_aux['pred_boxes'] = torch.where(condition, tgt_boxes, outputs_without_aux['pred_boxes'])
         outputs_without_aux['pred_boxes'] = outputs_without_aux['pred_boxes'] * condition
 
@@ -452,7 +452,7 @@ def build(args):
         # max_obj_id + 1, but the exact value doesn't really matter
         num_classes = 250
     if args.dataset_file == "toy_setting" or args.dataset_file == "real_gates":
-        num_classes = 4
+        num_classes = 3
     device = torch.device(args.device)
 
     backbone = build_backbone(args)
