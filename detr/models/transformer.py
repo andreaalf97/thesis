@@ -222,7 +222,7 @@ class TransformerDecoderLayer(nn.Module):
         self.activation = _get_activation_fn(activation)
         self.normalize_before = normalize_before
 
-        attn_mask = torch.ones((100, 100), dtype=torch.bool)
+        attn_mask = torch.ones((150, 150), dtype=torch.bool)
         for out in range(attn_mask.shape[0]):
             for inp in range(attn_mask.shape[1]):
                 if inp <= out:
