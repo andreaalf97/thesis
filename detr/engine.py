@@ -564,13 +564,14 @@ def match_predictions_optim(pred_logits: torch.Tensor, pred_boxes: torch.Tensor,
         for j, (pred_box, _, _) in enumerate(predictions):  # For each prediction mask we compare it
             print(pred_box)
             print(gt_box)
-            exit(0)
             iou_score = torch.cdist(
-                pred_box,
-                gt_box,
+                pred_box.unsqueeze(0),
+                gt_box.unsqueeze(0),
                 p=1
             )
-            cost_matrix[i][j] = iou_score
+            print(iou_score)
+            exit(0)
+            cost_matrix[i][j] = iou_score.item()
 
     cost_matrix = np.array(cost_matrix)
     match = linear_sum_assignment(cost_matrix, maximize=True)
