@@ -135,8 +135,8 @@ class DETR(nn.Module):
         outputs_class = self.class_embed(hs)
         outputs_coord = self.bbox_embed(hs).sigmoid()
         out = {'pred_logits': outputs_class[-1], 'pred_boxes': outputs_coord[-1]}
-        # if self.aux_loss:
-        #     out['aux_outputs'] = self._set_aux_loss(outputs_class, outputs_coord)
+        if self.aux_loss:
+            out['aux_outputs'] = self._set_aux_loss(outputs_class, outputs_coord)
         return out
 
     @torch.jit.unused
@@ -334,6 +334,15 @@ class SetCriterion(nn.Module):
             'loss_ce': F.cross_entropy(outputs_without_aux['pred_logits'].permute(0, 2, 1), tgt_logits, reduction='sum'),
             'loss_bbox': F.l1_loss(outputs_without_aux['pred_boxes'], tgt_boxes, reduction='sum')
         }
+
+        if 'aux_outputs' in outputs:
+            for i, aux_outputs in enumerate(outputs['aux_outputs']):
+                l_dict = {
+                    'loss_ce' + f'_{i}': F.cross_entropy(aux_outputs['pred_logits'].permute(0, 2, 1), tgt_logits,
+                                               reduction='sum'),
+                    'loss_bbox' + f'_{i}': F.l1_loss(aux_outputs['pred_boxes'], tgt_boxes, reduction='sum')
+                }
+                loss_dict.update(l_dict)
 
         return loss_dict
 
