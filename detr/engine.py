@@ -264,8 +264,8 @@ def plot_image_with_labels(samples: torch.Tensor, targets: torch.Tensor, num_sam
 @torch.no_grad()
 def plot_prediction(samples: utils.NestedTensor, outputs: torch.Tensor, targets: tuple):
 
-    confidences, classes_batch = torch.max(outputs[:, :, 8:11], dim=2)  # [batch_size, seq_len]
-    coords_batch = outputs[:, :, :8]  # [batch_size, seq_len, 2]
+    confidences, classes_batch = torch.max(outputs[:, :, 2:5], dim=2)  # [batch_size, seq_len]
+    coords_batch = outputs[:, :, :2]  # [batch_size, seq_len, 2]
 
     colors = [
         "tab:blue",
@@ -285,7 +285,7 @@ def plot_prediction(samples: utils.NestedTensor, outputs: torch.Tensor, targets:
         "palegreen"
     ]
 
-    colors = colors * 5
+    colors = colors * 50
 
     for image, class_seq, coords_seq, target, confidence in zip(samples.tensors, classes_batch, coords_batch, targets, confidences):
         num_predictions = 0
@@ -295,8 +295,9 @@ def plot_prediction(samples: utils.NestedTensor, outputs: torch.Tensor, targets:
 
         for cl, xy, color, conf in zip(class_seq, coords_seq, colors, confidence):
             if cl == 1:
-                plt.scatter(xy[::2].cpu() * w, xy[1::2].cpu() * h, c=color)
-                plt.text(xy[2].cpu() * w, xy[3].cpu() * h, str(conf.item() * 100)[:5] + "%", color=color)
+                num_predictions += 1
+                plt.scatter(xy[0].cpu() * w, xy[1].cpu() * h, c=color)
+                # plt.text(xy[2].cpu() * w, xy[3].cpu() * h, str(conf.item() * 100)[:5] + "%", color=color)
 
 
         # for logit, coord, color in zip(logits, coords, colors):
@@ -574,20 +575,21 @@ def match_predictions_optim(sequence: torch.Tensor, gt_boxes: torch.Tensor) -> t
     """
     predictions = []
     for i, token in enumerate(sequence):
-        conf, cl = torch.max(token[8:], dim=0)
+        conf, cl = torch.max(token[2:], dim=0)
         if cl == 1:
             predictions.append((
-                token[:8], conf, i
+                token[:2], conf.item(), i
             ))
 
     cost_matrix = [[0 for _ in range(len(predictions))] for _ in range(len(gt_boxes))]
     for i, gt_box in enumerate(gt_boxes):  # For each GT mask we find the best match
         for j, (pred_box, _, _) in enumerate(predictions):  # For each prediction mask we compare it
-            iou_score = iou(
-                pred_box,
-                gt_box
+            iou_score = torch.cdist(
+                pred_box.unsqueeze(0),
+                gt_box.unsqueeze(0),
+                p=1
             )
-            cost_matrix[i][j] = iou_score
+            cost_matrix[i][j] = 1 - iou_score.item()
 
     cost_matrix = np.array(cost_matrix)
     match = linear_sum_assignment(cost_matrix, maximize=True)
