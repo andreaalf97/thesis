@@ -36,10 +36,6 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
 
     for samples, targets in metric_logger.log_every(data_loader, print_freq, header):
 
-        print(targets[0]['sequence'][:, :8])
-        plt.imshow(samples.tensors[0].permute(1, 2, 0).cpu())
-        plt.show()
-
         # coco_sample = torch.load("tmp/coco_sample_from_dataloader.pt")
         # samples, targets = torch.load("tmp/samples.pth"), torch.load("tmp/targets.pth")
         # show_coco_sample(samples, targets, s_num=0)
