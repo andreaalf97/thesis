@@ -9,14 +9,23 @@ import torchvision.transforms as T
 import matplotlib.pyplot as plt
 
 
+COLOR = {
+    'red': (255, 0, 0),
+    'green': (0, 255, 0),
+    'blue': (0, 0, 255)
+}
+
 class PolyGate:
 
-    def __init__(self, image_height, image_width, color='none', stroke=-1):
+    def __init__(self, image_height, image_width, color='none', stroke=-1, num_points=20):
 
         self.image_height, self.image_width = image_height, image_width
 
-        self.x = random.randint(int(0.05*image_width), int(image_width - (0.05*image_width)))
-        self.y = random.randint(int(0.05*image_height), int(image_height - (0.05*image_height)))
+        self.points = []
+        for _ in range(num_points):
+            x = random.randint(int(0.05*image_width), int(image_width - (0.05*image_width)))
+            y = random.randint(int(0.05*image_height), int(image_height - (0.05*image_height)))
+            self.points.append((x, y))
 
         if stroke == -1:
             self.stroke = random.randint(1, 3)
@@ -37,7 +46,7 @@ class PolyGate:
             raise Exception(f"Color {color} not supported")
 
     def get_labels(self) -> list:
-        return [float(self.x) / self.image_width, float(self.y) / self.image_height]
+        return [[float(x) / self.image_width, float(y) / self.image_height] for x, y in self.points]
 
     def get_area(self) -> float:
         return 1
@@ -46,44 +55,53 @@ class PolyGate:
         return 0
 
 
-def get_ts_image(height, width, num_gates=3, no_gate_chance=0.10, black_and_white=True, stroke=-1, fix_gates=False) -> (np.ndarray, list, list):
-
-    if random.random() < no_gate_chance:
-        num_gates = 0
-    else:
-        if not fix_gates:
-            num_gates = random.randint(1, num_gates)
+def get_ts_image(height, width, num_gates=3, black_and_white=True, stroke=-1) -> (np.ndarray, list, list):
 
     img = get_ts_background(height, width, bgr=False, black_white=black_and_white)
 
-    labels = []
-    areas = []
-    classes = []
+    if black_and_white:
+        gate = PolyGate(height, width, color='white', stroke=stroke, num_points=num_gates)
+    else:
+        gate = PolyGate(height, width, color='none', stroke=stroke, num_points=num_gates)
 
-    for _ in range(num_gates):
-        if black_and_white:
-            gate = PolyGate(height, width, color='white', stroke=stroke)
-        else:
-            gate = PolyGate(height, width, color='none', stroke=stroke)
-
-        labels.append(gate.get_labels())
-        areas.append(gate.get_area())
-        classes.append(gate.get_class())
-        img = print_polygate(img, gate)
+    labels = gate.get_labels()
+    areas = gate.get_area()
+    classes = gate.get_class()
+    img = print_polygate(img, gate)
 
     return img, labels, areas, classes
 
 
 def print_polygate(img: np.ndarray, gate: PolyGate) -> np.ndarray:
 
+    for i in range(1, len(gate.points)):
+        img = cv2.line(
+            img,
+            (gate.points[i-1][0], gate.points[i-1][1]),
+            (gate.points[i][0], gate.points[i][1]),
+            color=gate.color,
+            thickness=2,
+            lineType=cv2.LINE_AA
+        )
+
     img = cv2.circle(
         img,
-        (gate.x, gate.y),
-        radius=gate.stroke,
-        color=gate.color,
+        (gate.points[0][0], gate.points[0][1]),
+        radius=5,
+        color=COLOR['red'],
         thickness=-1,
         lineType=cv2.LINE_AA
     )
+    for x, y in gate.points[1:]:
+        img = cv2.circle(
+            img,
+            (x, y),
+            radius=4,
+            color=COLOR['green'],
+            thickness=-1,
+            lineType=cv2.LINE_AA
+        )
+
     return img
 
 
@@ -133,15 +151,12 @@ class ToTensor(object):
 
 class TSDataset(torch.utils.data.Dataset):
 
-    def __init__(self, img_height, img_width, num_gates=3, black_and_white=True,
-                 no_gate_chance=0.0, stroke=-1, fix_gates=False):
+    def __init__(self, img_height, img_width, num_gates=3, black_and_white=True, stroke=-1):
         self.img_height = img_height
         self.img_width = img_width
         self.num_gates = num_gates
         self.black_and_white = black_and_white
-        self.no_gate_chance = no_gate_chance
         self.stroke = stroke
-        self.fix_gates = fix_gates
         self.transform = T.Compose([
                 ToTensor(),
                 # Clamp(),
@@ -156,10 +171,8 @@ class TSDataset(torch.utils.data.Dataset):
             self.img_height,
             self.img_width,
             num_gates=self.num_gates,
-            no_gate_chance=self.no_gate_chance,
             black_and_white=self.black_and_white,
-            stroke=self.stroke,
-            fix_gates=self.fix_gates
+            stroke=self.stroke
         )
 
         # boxes, labels, image_id, area, iscrowd, orig_size, size
@@ -185,8 +198,7 @@ if __name__ == '__main__':
         256, 256,
         num_gates=20,
         black_and_white=True,
-        no_gate_chance=0.0,
-        stroke=2,
+        stroke=2
     )
 
     for image, target in ds:
