@@ -15,17 +15,26 @@ CLASSES = {
     "<end-of-computation>": 2
 }
 
+COLOR = {
+    'red': (255, 0, 0),
+    'green': (0, 255, 0),
+    'blue': (0, 0, 255)
+}
+
 class PolyGate:
 
     MIN_CORNERS = 3
     MAX_CORNERS = 7
 
-    def __init__(self, image_height, image_width, color='none', stroke=-1):
+    def __init__(self, image_height, image_width, color='none', stroke=-1, num_points=20):
 
         self.image_height, self.image_width = image_height, image_width
 
-        self.x = random.randint(int(0.05*image_width), int(image_width - (0.05*image_width)))
-        self.y = random.randint(int(0.05*image_height), int(image_height - (0.05*image_height)))
+        self.points = []
+        for _ in range(num_points):
+            x = random.randint(int(0.05*image_width), int(image_width - (0.05*image_width)))
+            y = random.randint(int(0.05*image_height), int(image_height - (0.05*image_height)))
+            self.points.append((x, y))
 
         if stroke == -1:
             self.stroke = random.randint(1, 3)
@@ -46,7 +55,7 @@ class PolyGate:
             raise Exception(f"Color {color} not supported")
 
     def get_labels(self) -> list:
-        return [float(self.x) / self.image_width, float(self.y) / self.image_height]
+        return [[float(x) / self.image_width, float(y) / self.image_height] for x, y in self.points]
 
     def get_area(self) -> float:
         return 1
@@ -55,92 +64,54 @@ class PolyGate:
         return 0
 
 
-def get_ts_image(height, width, num_gates=3, no_gate_chance=0.10, black_and_white=True, stroke=-1, fix_gates=False) -> (np.ndarray, list, list):
-
-    if random.random() < no_gate_chance:
-        num_gates = 0
-    else:
-        if not fix_gates:
-            num_gates = random.randint(1, num_gates)
+def get_ts_image(height, width, num_gates=3, black_and_white=True, stroke=-1) -> (np.ndarray, list, list):
 
     img = get_ts_background(height, width, bgr=False, black_white=black_and_white)
 
-    labels = []
-    areas = []
-    classes = []
+    if black_and_white:
+        gate = PolyGate(height, width, color='white', stroke=stroke, num_points=num_gates)
+    else:
+        gate = PolyGate(height, width, color='none', stroke=stroke, num_points=num_gates)
 
-    for _ in range(num_gates):
-        if black_and_white:
-            gate = PolyGate(height, width, color='white', stroke=stroke)
-        else:
-            gate = PolyGate(height, width, color='none', stroke=stroke)
-
-        labels.append(gate.get_labels())
-        areas.append(gate.get_area())
-        classes.append(gate.get_class())
-        img = print_polygate(img, gate)
+    labels = gate.get_labels()
+    areas = gate.get_area()
+    classes = gate.get_class()
+    img = print_polygate(img, gate)
 
     return img, labels, areas, classes
 
 
 def print_polygate(img: np.ndarray, gate: PolyGate) -> np.ndarray:
 
+    for i in range(1, len(gate.points)):
+        img = cv2.line(
+            img,
+            (gate.points[i-1][0], gate.points[i-1][1]),
+            (gate.points[i][0], gate.points[i][1]),
+            color=gate.color,
+            thickness=2,
+            lineType=cv2.LINE_AA
+        )
+
     img = cv2.circle(
         img,
-        (gate.x, gate.y),
-        radius=gate.stroke,
-        color=gate.color,
+        (gate.points[0][0], gate.points[0][1]),
+        radius=5,
+        color=COLOR['red'],
         thickness=-1,
         lineType=cv2.LINE_AA
     )
+    for x, y in gate.points[1:]:
+        img = cv2.circle(
+            img,
+            (x, y),
+            radius=4,
+            color=COLOR['green'],
+            thickness=-1,
+            lineType=cv2.LINE_AA
+        )
 
     return img
-
-
-def validate_poly(corners):
-
-    if len(corners) == 3:
-        return True
-
-    lines = []
-
-    # Create list of lines
-    lines.append([corners[0], corners[1]])
-    for i in range(1, len(corners)-1):
-        lines.append([corners[i], corners[i+1]])
-    lines.append([corners[-1], corners[0]])
-
-    for i in range(len(lines)):
-        temp_lines = lines.copy()
-        temp_lines.remove(lines[i + 1] if i + 1 < len(lines) else lines[0])
-        temp_lines.remove(lines[i])
-        temp_lines.remove(lines[i - 1])
-
-        for line_2 in temp_lines:
-            if line_intersection(lines[i], line_2):
-                return False
-
-    return True
-
-
-def line_intersection(line1, line2):
-
-    a, b = line1
-    c, d = line2
-
-    if clockwise(a, b, c) * clockwise(a, b, d) > 0:
-        return False
-    if clockwise(c, d, a) * clockwise(c, d, b) > 0:
-        return False
-    return True
-
-
-def clockwise(a, b, c):
-    ax, ay = a
-    bx, by = b
-    cx, cy = c
-
-    return (bx - ax) * (cy - ay) - (cx - ax) * (by - ay)
 
 
 def get_ts_background(height, width, bgr=False, black_white=False) -> np.ndarray:
@@ -199,33 +170,11 @@ class GetSentence(object):
         start_token[2 + CLASSES['<start>']] = 1
         sequence.append(start_token)
 
-        if self.seq_order == 'random':
-            raise Exception("Not ready for random ordering of polygons")
-        elif self.seq_order in ['lr', 'rl', 'tb', 'bt']:
-            centers = []
-            for polygon in target['boxes']:
-                mean_x = polygon[0].item()
-                mean_y = polygon[1].item()
-                centers.append((mean_x, mean_y))
-            centers = {i: c for i, c in enumerate(centers)}
-
-            if self.seq_order == 'lr':
-                centers = sorted(centers.items(), key=lambda x: x[1][0])
-            elif self.seq_order == 'rl':
-                centers = sorted(centers.items(), key=lambda x: x[1][0], reverse=True)
-            elif self.seq_order == 'tb':
-                centers = sorted(centers.items(), key=lambda x: x[1][1])
-            elif self.seq_order == 'bt':
-                centers = sorted(centers.items(), key=lambda x: x[1][1], reverse=True)
-
-            for i, center in centers:
-                polygon = target['boxes'][i]
-                token = torch.zeros(256)
-                token[2 + CLASSES['<point>']] = 1
-                token[:2] = polygon
-                sequence.append(token)
-        elif self.seq_order in ['sl', 'ls']:
-            raise Exception("No ordering based on area for points")
+        for point in target['boxes']:
+            token = torch.zeros(256)
+            token[2 + CLASSES['<point>']] = 1
+            token[:2] = point
+            sequence.append(token)
 
         end_computation = torch.zeros(256)
         end_computation[2 + CLASSES['<end-of-computation>']] = 1
@@ -238,17 +187,14 @@ class GetSentence(object):
 
 class TSDataset(torch.utils.data.Dataset):
 
-    def __init__(self, img_height, img_width, num_gates=3, black_and_white=True,
-                 no_gate_chance=0.0, stroke=-1, seq_order='tb', fix_gates=False):
+    def __init__(self, img_height, img_width, num_gates=3, black_and_white=True, stroke=-1, seq_order='tb'):
         assert seq_order in ('ls', 'sl', 'lr', 'rl', 'tb', 'bt', 'random'), f"{seq_order} order not implemented for TOY SETTING"
         self.img_height = img_height
         self.img_width = img_width
         self.num_gates = num_gates
         self.black_and_white = black_and_white
-        self.no_gate_chance = no_gate_chance
         self.stroke = stroke
         self.seq_order = seq_order
-        self.fix_gates = fix_gates
         self.transform = T.Compose([
                 ToTensor(),
                 # Clamp(),
@@ -264,10 +210,8 @@ class TSDataset(torch.utils.data.Dataset):
             self.img_height,
             self.img_width,
             num_gates=self.num_gates,
-            no_gate_chance=self.no_gate_chance,
             black_and_white=self.black_and_white,
-            stroke=self.stroke,
-            fix_gates=self.fix_gates
+            stroke=self.stroke
         )
 
         # boxes, labels, image_id, area, iscrowd, orig_size, size
@@ -289,7 +233,7 @@ class TSDataset(torch.utils.data.Dataset):
 
 if __name__ == '__main__':
 
-    ds = TSDataset(256, 256, num_gates=4, black_and_white=True, no_gate_chance=0.0, stroke=-1, seq_order='lr')
+    ds = TSDataset(256, 256, num_gates=10, black_and_white=True, stroke=-1, seq_order='lr')
 
     start = 0
     point = 0
@@ -308,15 +252,16 @@ if __name__ == '__main__':
         plt.imshow(image.permute(1, 2, 0))
 
         sequence = target['sequence']
-        print(sequence[:, :5])
-
-        for i, element in enumerate(sequence[1:]):
+        x, y = [], []
+        plt.scatter(sequence[1][0].cpu() * 256, sequence[1][1].cpu() * 256, c='green')
+        for i, element in enumerate(sequence[2:]):
             if element[2 + CLASSES['<end-of-computation>']] == 1:
                 break
-            x = element[0] * 256
-            y = element[1] * 256
+            plt.scatter(element[0].cpu() * 256, element[1].cpu() * 256, label=i)
+            x.append(element[0].cpu() * 256)
+            y.append(element[1].cpu() * 256)
 
-            plt.scatter(x.cpu(), y.cpu(), label=i)
+            # plt.scatter(x, y, c='red')
 
         plt.legend()
         plt.show()
