@@ -2,9 +2,7 @@ import numpy as np
 import cv2
 import random
 import torch
-import math
 
-from PIL import Image, ImageDraw
 import torchvision.transforms as T
 import matplotlib.pyplot as plt
 
@@ -30,11 +28,15 @@ class PolyGate:
 
         self.image_height, self.image_width = image_height, image_width
 
-        self.points = []
-        for _ in range(num_points):
-            x = random.randint(int(0.05*image_width), int(image_width - (0.05*image_width)))
-            y = random.randint(int(0.05*image_height), int(image_height - (0.05*image_height)))
-            self.points.append((x, y))
+        x = list(np.linspace(0.10, 0.90, num_points))
+        noise = [random.random() * 0.3 - 0.15 for _ in x]
+        y = [(1 - i) + (n) for i, n in zip(x, noise)]
+        x = [i + n for i, n in zip(x, noise)]
+
+        x = [max(0, min(1, i)) for i in x]
+        y = [max(0, min(1, i)) for i in y]
+
+        self.points = [(round(i * image_width), round(j * image_height)) for i, j in zip(x, y)]
 
         if stroke == -1:
             self.stroke = random.randint(1, 3)
@@ -96,8 +98,8 @@ def print_polygate(img: np.ndarray, gate: PolyGate) -> np.ndarray:
     img = cv2.circle(
         img,
         (gate.points[0][0], gate.points[0][1]),
-        radius=5,
-        color=COLOR['red'],
+        radius=4,
+        color=COLOR['green'],
         thickness=-1,
         lineType=cv2.LINE_AA
     )
