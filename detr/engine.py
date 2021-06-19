@@ -293,11 +293,15 @@ def plot_prediction(samples: utils.NestedTensor, outputs: torch.Tensor, targets:
         h, w = list(image.shape)[-2:]
         plt.imshow(image.cpu().permute(1, 2, 0))
 
+        x, y = [], []
         for cl, xy, color, conf in zip(class_seq, coords_seq, colors, confidence):
             if cl == 1:
                 num_predictions += 1
-                plt.scatter(xy[0].cpu() * w, xy[1].cpu() * h, c=color)
+                x.append(xy[0].cpu() * w)
+                y.append(xy[1].cpu() * h)
                 # plt.text(xy[2].cpu() * w, xy[3].cpu() * h, str(conf.item() * 100)[:5] + "%", color=color)
+
+        plt.scatter(x, y)
 
 
         # for logit, coord, color in zip(logits, coords, colors):
