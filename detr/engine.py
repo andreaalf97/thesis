@@ -273,36 +273,23 @@ def plot_prediction(samples: utils.NestedTensor, outputs: dict, targets: tuple):
 
     for image, logits, coords, target in zip(samples.tensors, logits_batch, coords_batch, targets):
 
-        num_predictions = 0
-
         h, w = list(image.shape)[-2:]
         plt.imshow(image.cpu().permute(1, 2, 0))
 
+        x, y, = [], []
+
         for logit, coord, color in zip(logits, coords, colors):
 
-            logit = torch.softmax(logit, 0)
-            confidence, index = torch.max(logit, 0)
+            # logit = torch.softmax(logit, 0)
+            # confidence, index = torch.max(logit, 0)
 
-            if index.item() == 0:
-                num_predictions += 1
-                for i in range(len(coord)):
-                    if coord[i] >= 1.0:
-                        coord[i] = torch.tensor(0.99)
-                    if coord[i] <= 0.0:
-                        coord[i] = torch.tensor(0.99)
-                bl_x, bl_y = coord[0], coord[1]
-                tl_x, tl_y = coord[2], coord[3]
-                tr_x, tr_y = coord[4], coord[5]
-                br_x, br_y = coord[6], coord[7]
+            x.append(coord[0].cpu() * w)
+            y.append(coord[1].cpu() * h)
 
-                plt.scatter(bl_x.cpu() * w, bl_y.cpu() * h, c=color)
-                plt.scatter(tl_x.cpu() * w, tl_y.cpu() * h, c=color)
-                plt.scatter(tr_x.cpu() * w, tr_y.cpu() * h, c=color)
-                plt.scatter(br_x.cpu() * w, br_y.cpu() * h, c=color)
+        plt.scatter(x, y)
 
-                plt.text(tl_x*w, tl_y*h, str(confidence.item()*100)[:5]+"%", color=color)
 
-        plt.title(f"FOUND {num_predictions} GATES WITH A TOTAL OF {len(target['labels'])}")
+        # plt.title(f"FOUND {num_predictions} GATES WITH A TOTAL OF {len(target['labels'])}")
         plt.show()
 
 
