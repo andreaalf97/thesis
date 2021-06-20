@@ -650,7 +650,6 @@ def evaluate_map(model, data_loader_val, device, args):
             score = torch.abs(sequence[1:-1, :2] - target['boxes'])
             score = score[:, 0] + score[:, 1]
             score = 1 - score.sum().cpu().item()
-            print(score)
 
             '''Scores is a list of tuples as long as the objects in the ground truth: (gt_index, pred_index, iou_score)'''
             # scores, false_positives = match_predictions_optim(
