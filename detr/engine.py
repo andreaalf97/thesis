@@ -642,7 +642,7 @@ def evaluate_map(model, data_loader_val, device, args):
 
         targets = [{k: v.to(torch.device('cpu')) for k, v in t.items()} for t in targets]
         outputs = outputs.to(torch.device('cpu'))
-        plot_prediction(images, outputs, targets)
+        # plot_prediction(images, outputs, targets)
         # continue
 
         for sequence, target in zip(outputs, targets):  # For each image in the dataset
