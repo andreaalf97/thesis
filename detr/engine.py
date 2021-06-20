@@ -301,7 +301,8 @@ def plot_prediction(samples: utils.NestedTensor, outputs: torch.Tensor, targets:
                 y.append(xy[1].cpu() * h)
                 # plt.text(xy[2].cpu() * w, xy[3].cpu() * h, str(conf.item() * 100)[:5] + "%", color=color)
 
-        plt.scatter(x, y)
+        for index, (i, j) in enumerate(zip(x, y)):
+            plt.scatter(i, j, label=index)
 
 
         # for logit, coord, color in zip(logits, coords, colors):
@@ -329,6 +330,7 @@ def plot_prediction(samples: utils.NestedTensor, outputs: torch.Tensor, targets:
         #         plt.text(tl_x*w, tl_y*h, str(confidence.item()*100)[:5]+"%", color=color)
 
         plt.title(f"FOUND {num_predictions} GATES WITH A TOTAL OF {len(target['labels'])}")
+        plt.legend()
         plt.show()
 
 
