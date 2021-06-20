@@ -286,10 +286,12 @@ def plot_prediction(samples: utils.NestedTensor, outputs: dict, targets: tuple):
             x.append(coord[0].cpu() * w)
             y.append(coord[1].cpu() * h)
 
-        plt.scatter(x, y)
+        for i, (a, b) in enumerate(zip(x, y)):
+            plt.scatter(a, b, label="%d: %.2f, %.2f" % (i, a/w, b/h))
 
 
         # plt.title(f"FOUND {num_predictions} GATES WITH A TOTAL OF {len(target['labels'])}")
+        plt.legend()
         plt.show()
 
 
@@ -609,12 +611,17 @@ def evaluate_map(model, data_loader_val, device, args):
             # print("pred_boxes", pred_boxes.shape)
             # print("target:\n" + '\n'.join('   ' + str(k) + ' -> ' + str(target[k].shape) for k in target))
 
+            score = torch.abs(pred_boxes - target['boxes'])
+            score = score[:, 0] + score[:, 1]
+            score = 1 - score.sum().cpu().item()
+            print(score)
+
             '''Scores is a list of tuples as long as the objects in the ground truth: (gt_index, pred_index, iou_score)'''
-            scores, false_positives = match_predictions_optim(
-                pred_logits=pred_logits,
-                pred_boxes=pred_boxes,
-                gt_boxes=target['boxes']
-            )
+            # scores, false_positives = match_predictions_optim(
+            #     pred_logits=pred_logits,
+            #     pred_boxes=pred_boxes,
+            #     gt_boxes=target['boxes']
+            # )
             img_id = int(target['image_id'].item())
 
             row = {
@@ -626,27 +633,19 @@ def evaluate_map(model, data_loader_val, device, args):
                 'gate': []
             }
 
-            for gt_index, pred_index, iou_score, confidence in scores:
-                row['img_id'].append(img_id)
-                row['gt_id'].append(int(gt_index))
-                row['pred_id'].append(int(pred_index))
-                row['confidence'].append(confidence)
-                row['outcome'].append(
-                    iou_score
-                )
-                row['gate'].append(pred_boxes[pred_index].tolist())
-            for conf, i in false_positives:
-                row['img_id'].append(img_id)
-                row['gt_id'].append(-1)
-                row['pred_id'].append(i)
-                row['confidence'].append(conf)
-                row['outcome'].append(0.0)
-                row['gate'].append(pred_boxes[i].tolist())
+            row['img_id'].append(img_id)
+            row['gt_id'].append(0)
+            row['pred_id'].append(0)
+            row['confidence'].append(1.)
+            row['outcome'].append(
+                score
+            )
+            row['gate'].append(pred_boxes.cpu().tolist())
 
             results = results.append(pd.DataFrame(row), ignore_index=True)
             image_objects = image_objects.append(pd.DataFrame({
                 'img_id': [img_id],
-                'num_objects': [len(target['boxes'])],
+                'num_objects': [1],
                 'gates': [target['boxes'].cpu().tolist()]
             }), ignore_index=True)
 
