@@ -95,7 +95,7 @@ class DETR(nn.Module):
 
             ended = [False for _ in range(bs)]
             while False in ended and tgt.shape[1] < 3000:
-                while query_pos.shape[0] < tgt.shape[1]:
+                while query_pos.shape[0] <= tgt.shape[1]:
                     query_pos = query_pos.repeat(2, 1, 1)
                 hs = self.transformer.decoder(tgt.permute(1, 0, 2), memory, memory_key_padding_mask=mask,
                                   pos=pos_embed, query_pos=query_pos[:tgt.shape[1], :, :])
