@@ -23,13 +23,6 @@ import pandas as pd
 from os.path import join
 
 
-CLASSES = {
-    "<start>": 0,
-    "<point>": 1,
-    "<end-of-polygon>": 2,
-    "<end-of-computation>": 3
-}
-
 def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
                     data_loader: Iterable, optimizer: torch.optim.Optimizer,
                     device: torch.device, epoch: int, max_norm: float = 0):
@@ -76,12 +69,9 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
             aux_outputs --> List of length 5 (repetitions of decoder - 1)
                 Each aux_output[i] is again a DICT with keys ['pred_logits', 'pred_boxes']
         """
-
-        max_seq_len = max([len(target['sequence']) for target in targets])
-
         outputs = model(
             samples,
-            torch.stack([target['sequence'] for target in targets])
+            tgt=torch.stack([target['sequence'] for target in targets])
         )
 
         # if index % 10 == 0:

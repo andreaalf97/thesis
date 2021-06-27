@@ -5,7 +5,6 @@ import torchvision
 from .coco import build as build_coco
 from .toy_setting import TSDataset
 from .real_gates import RealGatesDS
-from .crowdai import CrowdAiDataset
 
 
 def get_coco_api_from_dataset(dataset):
@@ -37,8 +36,6 @@ def build_dataset(image_set, args):
                          image_set=image_set)
     if args.dataset_file == 'real_gates':
         return RealGatesDS(args.real_gate_path, pkl_path=args.real_gate_pickle_path, image_set=image_set, seq_order=args.seq_order)
-    if args.dataset_file == 'crowdai':
-        return CrowdAiDataset(args.crowdai_path, image_set=image_set, mask_rcnn=False, seq_order=args.seq_order, area_threshold=15)
     raise ValueError(f'dataset {args.dataset_file} not supported')
 
 

@@ -41,7 +41,7 @@ class DETR(nn.Module):
         self.backbone = backbone
         self.aux_loss = aux_loss
 
-    def forward(self, samples: NestedTensor, tgt: torch.Tensor):
+    def forward(self, samples: NestedTensor, tgt=None):
         """ The forward expects a NestedTensor, which consists of:
                - samples.tensor: batched images, of shape [batch_size x 3 x H x W]
                - samples.mask: a binary mask of shape [batch_size x H x W], containing 1 on padded pixels
@@ -56,9 +56,6 @@ class DETR(nn.Module):
                - "aux_outputs": Optional, only returned when auxiliary losses are activated. It is a list of
                                 dictionaries containing the two above keys for each decoder layer.
         """
-        samples = samples.to(self.class_embed.weight.device)
-        tgt = tgt.to(self.class_embed.weight.device)
-
         if isinstance(samples, (list, torch.Tensor)):
             samples = nested_tensor_from_tensor_list(samples)
 

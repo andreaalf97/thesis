@@ -324,10 +324,9 @@ class GetSentence(object):
                 end_polygon[2 + CLASSES['<end-of-polygon>']] = 1
                 sequence.append(end_polygon)
 
-        while len(sequence) < max_lenght:
-            end_computation = torch.zeros(256)
-            end_computation[2 + CLASSES['<end-of-computation>']] = 1
-            sequence.append(end_computation)
+        end_computation = torch.zeros(256)
+        end_computation[2 + CLASSES['<end-of-computation>']] = 1
+        sequence.append(end_computation)
 
         sequence = torch.stack(sequence)
 

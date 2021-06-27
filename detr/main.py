@@ -122,10 +122,6 @@ def get_args_parser():
     parser.add_argument('--world_size', default=1, type=int,
                         help='number of distributed processes')
     parser.add_argument('--dist_url', default='env://', help='url used to set up distributed training')
-
-    # My distributed training
-    # parser.add_argument('--num_gpus', default=1, type=int,
-    #                     help='number of available GPUs')
     return parser
 
 
@@ -163,11 +159,8 @@ def main(args):
 
     model_without_ddp = model
     if args.distributed:
-        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu], find_unused_parameters=True)
+        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
         model_without_ddp = model.module
-    # if args.num_gpus > 1:  # My Distributed Training
-    #     model = torch.nn.parallel.DataParallel(model, device_ids=range(args.num_gpus))
-    #     model_without_ddp = model.module
     n_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print('number of params:', n_parameters)
 
